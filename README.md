@@ -1,6 +1,14 @@
 # Patrimonio — App de gestión personal
 
+**Versión 1.1**
+
 App móvil-first para gestión de patrimonio personal. React + Vite, datos en localStorage.
+
+### Novedades v1.1 (Sorare)
+- Carteras Cash y ETH con botón para añadir fondos
+- Al comprar carta: elegir pago (Cash Sorare, ETH o Apple Pay)
+- Pestaña Movimientos con historial completo del balance
+- Galería de cartas agrupada por rareza (Limited, Rare, Super Rare, Única)
 
 ## Estructura
 
