@@ -24,6 +24,8 @@ export function AppProvider({ children }) {
   const [sorareCards, setSorareCards] = useLocalStorage('sorareCards', [])
   const [sorarePrizes, setSorarePrizes] = useLocalStorage('sorarePrizes', [])
   const [sorareCompetitions, setSorareCompetitions] = useLocalStorage('sorareCompetitions', [])
+  const [sorareBalances, setSorareBalances] = useLocalStorage('sorareBalances', { cash: 0, eth: 0 })
+  const [sorareBalanceMoves, setSorareBalanceMoves] = useLocalStorage('sorareBalanceMoves', [])
   const [cryptoPrices, setCryptoPrices] = useLocalStorage('cryptoPrices', {})
 
   // Computed: total monthly obligations
@@ -105,6 +107,26 @@ export function AppProvider({ children }) {
     setSorarePrizes(prev => [...prev, { ...prize, id: Date.now().toString(), date: new Date().toISOString() }])
   }
 
+  const adjustSorareBalance = ({ wallet, amount, type = 'deposit', note = '' }) => {
+    const amt = parseFloat(amount)
+    if (!amt || amt <= 0 || !['cash', 'eth'].includes(wallet)) return false
+    const delta = type === 'withdraw' ? -amt : amt
+    setSorareBalances(prev => {
+      const current = prev?.[wallet] ?? 0
+      const next = Math.max(0, current + delta)
+      return { cash: prev?.cash ?? 0, eth: prev?.eth ?? 0, [wallet]: next }
+    })
+    setSorareBalanceMoves(prev => [...prev, {
+      id: Date.now().toString(),
+      wallet,
+      amount: amt,
+      type,
+      note,
+      date: new Date().toISOString(),
+    }])
+    return true
+  }
+
   return (
     <AppContext.Provider value={{
       income, setIncome,
@@ -119,6 +141,9 @@ export function AppProvider({ children }) {
       sorareCards, addSorareCard, updateSorareCard, deleteSorareCard,
       sorarePrizes, addSorarePrize, setSorarePrizes,
       sorareCompetitions, setSorareCompetitions,
+      sorareBalances, setSorareBalances,
+      sorareBalanceMoves,
+      adjustSorareBalance,
       cryptoPrices, setCryptoPrices,
       getCurrentMonth,
       getMonthlyObligations,

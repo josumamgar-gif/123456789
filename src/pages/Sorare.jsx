@@ -151,6 +151,95 @@ function SellModal({ card, onClose }) {
   )
 }
 
+function FundModal({ onClose }) {
+  const { adjustSorareBalance } = useApp()
+  const [wallet, setWallet] = useState('cash')
+  const [moveType, setMoveType] = useState('deposit')
+  const [amount, setAmount] = useState('')
+  const [note, setNote] = useState('')
+
+  const handleSave = () => {
+    if (!adjustSorareBalance({ wallet, amount, type: moveType, note: note.trim() })) return
+    onClose()
+  }
+
+  return (
+    <Modal title="Ajustar cartera" onClose={onClose}>
+      <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5, marginBottom: 14 }}>
+        Registra depósitos o retiros de tu saldo en Sorare. <strong>Cash (€)</strong>: dinero que añades con tarjeta o banco para comprar cartas.
+        <strong> ETH</strong>: premios de ligas o ETH que transfieres a tu wallet de Sorare.
+      </p>
+
+      <div className="form-group">
+        <label className="form-label">Cartera</label>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {[['cash', 'Cash (€)'], ['eth', 'ETH']].map(([w, label]) => (
+            <button key={w} onClick={() => setWallet(w)} style={{
+              padding: '10px', borderRadius: 8, fontSize: 13, fontWeight: 700, border: '1px solid',
+              borderColor: wallet === w ? (w === 'cash' ? 'var(--green)' : 'var(--blue)') : 'var(--border)',
+              background: wallet === w ? (w === 'cash' ? 'rgba(34,168,90,0.1)' : 'rgba(10,138,173,0.1)') : 'transparent',
+              color: wallet === w ? (w === 'cash' ? 'var(--green)' : 'var(--blue)') : 'var(--text3)',
+            }}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">Operación</label>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {[['deposit', 'Añadir fondos'], ['withdraw', 'Retirar']].map(([t, label]) => (
+            <button key={t} onClick={() => setMoveType(t)} style={{
+              padding: '8px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: '1px solid',
+              borderColor: moveType === t ? (t === 'deposit' ? 'var(--green)' : 'var(--red)') : 'var(--border)',
+              background: moveType === t ? (t === 'deposit' ? 'rgba(34,168,90,0.1)' : 'rgba(224,61,61,0.08)') : 'transparent',
+              color: moveType === t ? (t === 'deposit' ? 'var(--green)' : 'var(--red)') : 'var(--text3)',
+            }}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">{wallet === 'cash' ? 'Cantidad (€)' : 'Cantidad (ETH)'}</label>
+        <input
+          className="form-input"
+          type="number"
+          min="0"
+          step={wallet === 'cash' ? '0.01' : '0.0001'}
+          placeholder={wallet === 'cash' ? '0.00' : '0.0000'}
+          value={amount}
+          onChange={e => setAmount(e.target.value)}
+          autoFocus
+        />
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">Nota (opcional)</label>
+        <input
+          className="form-input"
+          placeholder={wallet === 'cash' ? 'Ej: Depósito tarjeta' : 'Ej: Premio All-Star'}
+          value={note}
+          onChange={e => setNote(e.target.value)}
+        />
+      </div>
+
+      <div style={{ display: 'flex', gap: 10 }}>
+        <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>Cancelar</button>
+        <button
+          className="btn btn-primary"
+          style={{ flex: 2, background: moveType === 'deposit' ? 'var(--green)' : 'var(--red)' }}
+          onClick={handleSave}
+        >
+          {moveType === 'deposit' ? 'Añadir' : 'Retirar'}
+        </button>
+      </div>
+    </Modal>
+  )
+}
+
 function PrizeModal({ prize, onClose }) {
   const { addSorarePrize, setSorarePrizes, sorarePrizes } = useApp()
   const isEdit = !!prize
@@ -194,7 +283,13 @@ function PrizeModal({ prize, onClose }) {
 }
 
 export default function Sorare() {
-  const { sorareCards, deleteSorareCard, updateSorareCard, sorarePrizes, setSorarePrizes } = useApp()
+  const {
+    sorareCards, deleteSorareCard, updateSorareCard,
+    sorarePrizes, setSorarePrizes,
+    sorareBalances, sorareBalanceMoves,
+  } = useApp()
+  const cashBalance = sorareBalances?.cash ?? 0
+  const ethBalance = sorareBalances?.eth ?? 0
   const [tab, setTab] = useState('cartera')
   const [filterRarity, setFilterRarity] = useState('all')
   const [modal, setModal] = useState(null)
@@ -218,10 +313,57 @@ export default function Sorare() {
     <div className="page">
       <div className="page-header">
         <h1 className="page-title">Sorare</h1>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <button className="btn btn-ghost" style={{ padding: '7px 11px', fontSize: 11 }} onClick={() => setModal('addFunds')}>+ Fondos</button>
           <button className="btn btn-ghost" style={{ padding: '7px 11px', fontSize: 11 }} onClick={() => setModal('addPrize')}>+ Premio</button>
           <button className="btn btn-primary" style={{ padding: '7px 13px', fontSize: 13 }} onClick={() => setModal('addCard')}>+ Carta</button>
         </div>
+      </div>
+
+      {/* Carteras Cash / ETH */}
+      <div className="card" style={{ marginBottom: 12, borderLeft: '3px solid var(--accent)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <span style={{ fontFamily: 'var(--font-head)', fontWeight: 600, fontSize: 13 }}>Carteras Sorare</span>
+          <button
+            className="btn btn-primary"
+            style={{ padding: '6px 12px', fontSize: 11, background: 'var(--green)' }}
+            onClick={() => setModal('addFunds')}
+          >
+            + Añadir fondos
+          </button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div style={{ background: 'rgba(34,168,90,0.08)', borderRadius: 8, padding: '10px 12px' }}>
+            <div style={{ color: 'var(--text3)', fontSize: 10, marginBottom: 2 }}>CASH (€)</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--green)' }}>{fmt(cashBalance)}€</div>
+            <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>Para comprar cartas</div>
+          </div>
+          <div style={{ background: 'rgba(10,138,173,0.08)', borderRadius: 8, padding: '10px 12px' }}>
+            <div style={{ color: 'var(--text3)', fontSize: 10, marginBottom: 2 }}>ETH</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--blue)' }}>{ethBalance.toFixed(4)} ETH</div>
+            <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>Premios y wallet</div>
+          </div>
+        </div>
+        <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 10, lineHeight: 1.45 }}>
+          Pulsa <strong>+ Añadir fondos</strong> cuando deposites € en Sorare o recibas ETH. Los premios de ligas también puedes registrarlos con <strong>+ Premio</strong>.
+        </p>
+        {sorareBalanceMoves.length > 0 && (
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+            <div style={{ fontSize: 10, color: 'var(--text3)', marginBottom: 6, fontWeight: 600 }}>ÚLTIMOS MOVIMIENTOS</div>
+            {[...sorareBalanceMoves].reverse().slice(0, 3).map(m => (
+              <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
+                <span style={{ color: 'var(--text2)' }}>
+                  {m.type === 'deposit' ? '+' : '−'}
+                  {m.wallet === 'cash' ? `${fmt(m.amount)}€` : `${m.amount} ETH`}
+                  {m.note ? ` · ${m.note}` : ''}
+                </span>
+                <span style={{ color: 'var(--text3)' }}>
+                  {format(new Date(m.date), 'd MMM', { locale: es })}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Balance */}
@@ -421,6 +563,7 @@ export default function Sorare() {
         </>
       )}
 
+      {modal === 'addFunds'         && <FundModal onClose={() => setModal(null)} />}
       {modal === 'addCard'          && <CardModal  card={null}    onClose={() => setModal(null)} />}
       {modal?.type === 'editCard'   && <CardModal  card={modal.c} onClose={() => setModal(null)} />}
       {modal?.type === 'sell'       && <SellModal  card={modal.c} onClose={() => setModal(null)} />}

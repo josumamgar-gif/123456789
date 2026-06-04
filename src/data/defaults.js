@@ -79,6 +79,8 @@ export const SORARE_COMPETITIONS = [
   'MLS', 'Champions League', 'Europa League',
 ]
 
+export const SORARE_BALANCES_DEFAULT = { cash: 0, eth: 0 }
+
 export const SORARE_RARITIES = ['limited', 'rare', 'super_rare', 'unique']
 
 export const RARITY_LABELS = {
