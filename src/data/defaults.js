@@ -81,6 +81,14 @@ export const SORARE_COMPETITIONS = [
 
 export const SORARE_BALANCES_DEFAULT = { cash: 0, eth: 0 }
 
+export const SORARE_PAYMENT_METHODS = ['cash', 'eth', 'apple_pay']
+
+export const SORARE_PAYMENT_LABELS = {
+  cash: 'Cash Sorare',
+  eth: 'ETH',
+  apple_pay: 'Apple Pay',
+}
+
 export const SORARE_RARITIES = ['limited', 'rare', 'super_rare', 'unique']
 
 export const RARITY_LABELS = {
@@ -88,6 +96,14 @@ export const RARITY_LABELS = {
   rare: 'Rare',
   super_rare: 'Super Rare',
   unique: 'Única',
+}
+
+// Limited=Naranja, Rare=Rojo, Super Rare=Azul, Unique=Morado
+export const RARITY_STYLE = {
+  limited:    { bg: 'rgba(212,96,10,0.12)',  c: '#d4600a' },
+  rare:       { bg: 'rgba(224,61,61,0.12)',  c: '#e03d3d' },
+  super_rare: { bg: 'rgba(59,111,240,0.12)', c: '#3b6ff0' },
+  unique:     { bg: 'rgba(124,77,255,0.12)', c: '#7c4dff' },
 }
 
 export const INCOME_DEFAULT = 2400

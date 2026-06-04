@@ -1,16 +1,29 @@
 import React, { useState } from 'react'
 import { useApp } from '../context/AppContext'
-import { SORARE_COMPETITIONS, SORARE_RARITIES, RARITY_LABELS } from '../data/defaults'
+import {
+  SORARE_COMPETITIONS,
+  SORARE_RARITIES,
+  SORARE_PAYMENT_METHODS,
+  SORARE_PAYMENT_LABELS,
+  RARITY_LABELS,
+  RARITY_STYLE,
+} from '../data/defaults'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 const fmt = (n) => n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-const RARITY_STYLE = {
-  limited:   { bg: 'rgba(9,136,176,0.1)',   c: '#0988b0' },
-  rare:      { bg: 'rgba(59,111,240,0.1)',   c: '#3b6ff0' },
-  super_rare:{ bg: 'rgba(201,135,10,0.1)',   c: '#c9870a' },
-  unique:    { bg: 'rgba(201,96,16,0.1)',    c: '#c96010' },
+const PAYMENT_STYLE = {
+  cash: { bg: 'rgba(34,168,90,0.1)', c: 'var(--green)', border: 'var(--green)' },
+  eth: { bg: 'rgba(10,138,173,0.1)', c: 'var(--blue)', border: 'var(--blue)' },
+  apple_pay: { bg: 'rgba(26,26,26,0.08)', c: '#1a1a1a', border: '#666' },
+}
+
+const MOVE_CATEGORY_LABELS = {
+  manual: 'Ajuste manual',
+  card_buy: 'Compra carta',
+  card_sell: 'Venta carta',
+  prize: 'Premio liga',
 }
 
 function Modal({ title, onClose, children }) {
@@ -25,16 +38,33 @@ function Modal({ title, onClose, children }) {
   )
 }
 
+function formatMoveAmount(m) {
+  if (m.wallet === 'eth') return `${Number(m.amount).toFixed(4)} ETH`
+  if (m.wallet === 'apple_pay') return `${fmt(m.amount)}€`
+  return `${fmt(m.amount)}€`
+}
+
+function formatMoveWallet(m) {
+  if (m.paymentMethod === 'apple_pay' || m.wallet === 'apple_pay') return 'Apple Pay'
+  if (m.wallet === 'eth') return 'ETH'
+  if (m.wallet === 'cash') return 'Cash'
+  return m.wallet || '—'
+}
+
 function CardModal({ card, onClose }) {
-  const { addSorareCard, updateSorareCard, sorareCompetitions, setSorareCompetitions } = useApp()
+  const { addSorareCard, updateSorareCard, sorareCompetitions, setSorareCompetitions, sorareBalances } = useApp()
   const isEdit = !!card
   const [player, setPlayer] = useState(card?.player || '')
   const [rarity, setRarity] = useState(card?.rarity || 'limited')
-  const [buyPrice, setBuyPrice] = useState(card?.buyPrice || '')
+  const [buyPrice, setBuyPrice] = useState(card?.buyPrice ?? '')
+  const [buyEthAmount, setBuyEthAmount] = useState(card?.buyEthAmount ?? '')
+  const [paymentMethod, setPaymentMethod] = useState(card?.paymentMethod || 'cash')
   const [selectedComps, setSelectedComps] = useState(card?.competitions || [])
   const [customComp, setCustomComp] = useState('')
 
   const allComps = [...SORARE_COMPETITIONS, ...sorareCompetitions]
+  const cashBal = sorareBalances?.cash ?? 0
+  const ethBal = sorareBalances?.eth ?? 0
 
   const toggleComp = (c) =>
     setSelectedComps(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])
@@ -47,8 +77,18 @@ function CardModal({ card, onClose }) {
   }
 
   const handleSave = () => {
-    if (!player || !buyPrice) return
-    const data = { player, rarity, buyPrice: parseFloat(buyPrice), competitions: selectedComps }
+    if (!player || buyPrice === '' || buyPrice === null) return
+    if (!isEdit && paymentMethod === 'eth' && (!buyEthAmount || parseFloat(buyEthAmount) <= 0)) return
+
+    const data = {
+      player,
+      rarity,
+      buyPrice: parseFloat(buyPrice),
+      competitions: selectedComps,
+      paymentMethod,
+      buyEthAmount: paymentMethod === 'eth' ? parseFloat(buyEthAmount) : null,
+    }
+
     if (isEdit) {
       updateSorareCard(card.id, data)
     } else {
@@ -85,6 +125,56 @@ function CardModal({ card, onClose }) {
         <input className="form-input" type="number" min="0" step="0.01" placeholder="0.00" value={buyPrice} onChange={e => setBuyPrice(e.target.value)} />
       </div>
 
+      {!isEdit && (
+        <div className="form-group">
+          <label className="form-label">Pagado con</label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+            {SORARE_PAYMENT_METHODS.map(pm => (
+              <button key={pm} onClick={() => setPaymentMethod(pm)} style={{
+                padding: '8px 4px', borderRadius: 8, fontSize: 10, fontWeight: 700, border: '1px solid',
+                borderColor: paymentMethod === pm ? PAYMENT_STYLE[pm].border : 'var(--border)',
+                background: paymentMethod === pm ? PAYMENT_STYLE[pm].bg : 'transparent',
+                color: paymentMethod === pm ? PAYMENT_STYLE[pm].c : 'var(--text3)',
+              }}>
+                {SORARE_PAYMENT_LABELS[pm]}
+              </button>
+            ))}
+          </div>
+          {paymentMethod === 'cash' && (
+            <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>
+              Saldo Cash: {fmt(cashBal)}€ — se descontará al guardar
+            </div>
+          )}
+          {paymentMethod === 'eth' && (
+            <>
+              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6, marginBottom: 8 }}>
+                Saldo ETH: {ethBal.toFixed(4)} — indica cuánto ETH gastaste
+              </div>
+              <input
+                className="form-input"
+                type="number"
+                min="0"
+                step="0.0001"
+                placeholder="ETH gastados (ej: 0.0125)"
+                value={buyEthAmount}
+                onChange={e => setBuyEthAmount(e.target.value)}
+              />
+            </>
+          )}
+          {paymentMethod === 'apple_pay' && (
+            <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>
+              No descuenta del saldo Sorare; queda registrado en movimientos
+            </div>
+          )}
+        </div>
+      )}
+
+      {isEdit && card?.paymentMethod && (
+        <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 12 }}>
+          Pagado con: <strong>{SORARE_PAYMENT_LABELS[card.paymentMethod] || card.paymentMethod}</strong>
+        </div>
+      )}
+
       <div className="form-group">
         <label className="form-label">Competiciones</label>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, maxHeight: 130, overflowY: 'auto', padding: '4px 0' }}>
@@ -114,16 +204,18 @@ function CardModal({ card, onClose }) {
 }
 
 function SellModal({ card, onClose }) {
-  const { updateSorareCard } = useApp()
+  const { sellSorareCard, updateSorareCard } = useApp()
+  const isEdit = card?.status === 'sold'
   const [sellPrice, setSellPrice] = useState(card?.sellPrice || '')
+  const [creditToCash, setCreditToCash] = useState(!isEdit)
 
   const handleSell = () => {
     if (!sellPrice) return
-    updateSorareCard(card.id, {
-      status: 'sold',
-      sellPrice: parseFloat(sellPrice),
-      sellDate: card.sellDate || new Date().toISOString(),
-    })
+    if (isEdit) {
+      updateSorareCard(card.id, { sellPrice: parseFloat(sellPrice) })
+    } else {
+      sellSorareCard(card.id, parseFloat(sellPrice), creditToCash)
+    }
     onClose()
   }
 
@@ -133,6 +225,11 @@ function SellModal({ card, onClose }) {
     <Modal title={`Vender — ${card.player}`} onClose={onClose}>
       <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: '10px 12px', marginBottom: 14, fontSize: 12 }}>
         Compra: <strong>{fmt(card.buyPrice)}€</strong>
+        {card.paymentMethod && (
+          <span style={{ marginLeft: 8, color: 'var(--text3)' }}>
+            · {SORARE_PAYMENT_LABELS[card.paymentMethod]}
+          </span>
+        )}
         {profit !== null && (
           <span style={{ marginLeft: 12, color: profit >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>
             {profit >= 0 ? '+' : ''}{fmt(profit)}€
@@ -143,6 +240,12 @@ function SellModal({ card, onClose }) {
         <label className="form-label">Precio de venta (€)</label>
         <input className="form-input" type="number" min="0" step="0.01" placeholder="0.00" value={sellPrice} onChange={e => setSellPrice(e.target.value)} autoFocus />
       </div>
+      {!isEdit && (
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text2)', marginBottom: 14, cursor: 'pointer' }}>
+          <input type="checkbox" checked={creditToCash} onChange={e => setCreditToCash(e.target.checked)} />
+          Sumar importe al saldo Cash y registrar en movimientos
+        </label>
+      )}
       <div style={{ display: 'flex', gap: 10 }}>
         <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>Cancelar</button>
         <button className="btn btn-primary" style={{ flex: 2, background: 'var(--green)' }} onClick={handleSell}>Confirmar venta</button>
@@ -166,10 +269,9 @@ function FundModal({ onClose }) {
   return (
     <Modal title="Ajustar cartera" onClose={onClose}>
       <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5, marginBottom: 14 }}>
-        Registra depósitos o retiros de tu saldo en Sorare. <strong>Cash (€)</strong>: dinero que añades con tarjeta o banco para comprar cartas.
-        <strong> ETH</strong>: premios de ligas o ETH que transfieres a tu wallet de Sorare.
+        Registra depósitos o retiros de tu saldo en Sorare. <strong>Cash (€)</strong>: dinero en Sorare.
+        <strong> ETH</strong>: premios o ETH en wallet. Las compras con carta se registran al añadir la carta.
       </p>
-
       <div className="form-group">
         <label className="form-label">Cartera</label>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -185,7 +287,6 @@ function FundModal({ onClose }) {
           ))}
         </div>
       </div>
-
       <div className="form-group">
         <label className="form-label">Operación</label>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -201,38 +302,17 @@ function FundModal({ onClose }) {
           ))}
         </div>
       </div>
-
       <div className="form-group">
         <label className="form-label">{wallet === 'cash' ? 'Cantidad (€)' : 'Cantidad (ETH)'}</label>
-        <input
-          className="form-input"
-          type="number"
-          min="0"
-          step={wallet === 'cash' ? '0.01' : '0.0001'}
-          placeholder={wallet === 'cash' ? '0.00' : '0.0000'}
-          value={amount}
-          onChange={e => setAmount(e.target.value)}
-          autoFocus
-        />
+        <input className="form-input" type="number" min="0" step={wallet === 'cash' ? '0.01' : '0.0001'} placeholder={wallet === 'cash' ? '0.00' : '0.0000'} value={amount} onChange={e => setAmount(e.target.value)} autoFocus />
       </div>
-
       <div className="form-group">
         <label className="form-label">Nota (opcional)</label>
-        <input
-          className="form-input"
-          placeholder={wallet === 'cash' ? 'Ej: Depósito tarjeta' : 'Ej: Premio All-Star'}
-          value={note}
-          onChange={e => setNote(e.target.value)}
-        />
+        <input className="form-input" placeholder="Ej: Depósito tarjeta" value={note} onChange={e => setNote(e.target.value)} />
       </div>
-
       <div style={{ display: 'flex', gap: 10 }}>
         <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>Cancelar</button>
-        <button
-          className="btn btn-primary"
-          style={{ flex: 2, background: moveType === 'deposit' ? 'var(--green)' : 'var(--red)' }}
-          onClick={handleSave}
-        >
+        <button className="btn btn-primary" style={{ flex: 2, background: moveType === 'deposit' ? 'var(--green)' : 'var(--red)' }} onClick={handleSave}>
           {moveType === 'deposit' ? 'Añadir' : 'Retirar'}
         </button>
       </div>
@@ -241,7 +321,7 @@ function FundModal({ onClose }) {
 }
 
 function PrizeModal({ prize, onClose }) {
-  const { addSorarePrize, setSorarePrizes, sorarePrizes } = useApp()
+  const { addSorarePrize, setSorarePrizes } = useApp()
   const isEdit = !!prize
   const [description, setDescription] = useState(prize?.description || '')
   const [ethAmount, setEthAmount] = useState(prize?.ethAmount || '')
@@ -262,6 +342,11 @@ function PrizeModal({ prize, onClose }) {
 
   return (
     <Modal title={isEdit ? 'Editar premio' : 'Añadir premio'} onClose={onClose}>
+      {!isEdit && (
+        <p style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 12 }}>
+          El ETH se sumará a tu cartera y aparecerá en Movimientos.
+        </p>
+      )}
       <div className="form-group">
         <label className="form-label">Descripción</label>
         <input className="form-input" placeholder="Ej: Liga All-Star semana 12" value={description} onChange={e => setDescription(e.target.value)} />
@@ -282,32 +367,126 @@ function PrizeModal({ prize, onClose }) {
   )
 }
 
+function CardItem({ card, onSell, onEdit, onDelete, showPayment }) {
+  return (
+    <div className="card" style={{ marginBottom: 10, borderLeft: `3px solid ${RARITY_STYLE[card.rarity]?.c || 'var(--border)'}` }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: 'var(--font-head)', fontWeight: 700, fontSize: 15 }}>{card.player}</div>
+          <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, marginTop: 4, background: RARITY_STYLE[card.rarity]?.bg, color: RARITY_STYLE[card.rarity]?.c }}>
+            {RARITY_LABELS[card.rarity]}
+          </span>
+          {showPayment && card.paymentMethod && (
+            <span style={{ display: 'inline-block', marginLeft: 6, padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: PAYMENT_STYLE[card.paymentMethod]?.bg || 'var(--bg3)', color: PAYMENT_STYLE[card.paymentMethod]?.c || 'var(--text2)' }}>
+              {SORARE_PAYMENT_LABELS[card.paymentMethod]}
+            </span>
+          )}
+          {card.purchaseDate && (
+            <div style={{ color: 'var(--text3)', fontSize: 11, marginTop: 4 }}>
+              Comprada: {format(new Date(card.purchaseDate), 'd MMM yyyy', { locale: es })}
+            </div>
+          )}
+          {card.competitions?.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+              {card.competitions.map(c => (
+                <span key={c} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, background: 'var(--bg3)', color: 'var(--text2)' }}>{c}</span>
+              ))}
+            </div>
+          )}
+        </div>
+        <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
+          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--red)' }}>{fmt(card.buyPrice)}€</div>
+          <div style={{ fontSize: 10, color: 'var(--text3)', marginBottom: 8 }}>compra</div>
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+            {onSell && (
+              <button className="btn btn-ghost" style={{ padding: '4px 9px', fontSize: 11, color: 'var(--green)', borderColor: '#1e9e5640' }} onClick={onSell}>Vender</button>
+            )}
+            {onEdit && (
+              <button className="btn btn-ghost" style={{ padding: '4px 9px', fontSize: 11 }} onClick={onEdit}>✏️</button>
+            )}
+            {onDelete && (
+              <button onClick={onDelete} style={{ fontSize: 11, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 2px' }}>✕</button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function RarityGallery({ cards, emptyIcon, emptyText, onSell, onEdit, onDelete }) {
+  const grouped = SORARE_RARITIES.map(r => ({
+    rarity: r,
+    items: cards.filter(c => c.rarity === r),
+  })).filter(g => g.items.length > 0)
+
+  if (cards.length === 0) {
+    return (
+      <div className="card" style={{ textAlign: 'center', padding: '32px 14px' }}>
+        <div style={{ fontSize: 26, marginBottom: 8 }}>{emptyIcon}</div>
+        <div style={{ color: 'var(--text3)', fontSize: 13 }}>{emptyText}</div>
+      </div>
+    )
+  }
+
+  return grouped.map(({ rarity, items }) => (
+    <section key={rarity} style={{ marginBottom: 18 }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 10,
+        paddingBottom: 6,
+        borderBottom: `2px solid ${RARITY_STYLE[rarity].c}`,
+      }}>
+        <span style={{
+          padding: '4px 12px',
+          borderRadius: 20,
+          fontSize: 12,
+          fontWeight: 700,
+          background: RARITY_STYLE[rarity].bg,
+          color: RARITY_STYLE[rarity].c,
+        }}>
+          {RARITY_LABELS[rarity]}
+        </span>
+        <span style={{ fontSize: 11, color: 'var(--text3)' }}>{items.length} carta{items.length !== 1 ? 's' : ''}</span>
+      </div>
+      {items.map(card => (
+        <CardItem
+          key={card.id}
+          card={card}
+          showPayment
+          onSell={onSell ? () => onSell(card) : null}
+          onEdit={onEdit ? () => onEdit(card) : null}
+          onDelete={onDelete ? () => onDelete(card.id) : null}
+        />
+      ))}
+    </section>
+  ))
+}
+
 export default function Sorare() {
   const {
-    sorareCards, deleteSorareCard, updateSorareCard,
+    sorareCards, deleteSorareCard, updateSorareCard, sellSorareCard,
     sorarePrizes, setSorarePrizes,
     sorareBalances, sorareBalanceMoves,
   } = useApp()
   const cashBalance = sorareBalances?.cash ?? 0
   const ethBalance = sorareBalances?.eth ?? 0
   const [tab, setTab] = useState('cartera')
-  const [filterRarity, setFilterRarity] = useState('all')
   const [modal, setModal] = useState(null)
-  // modal types: 'addCard' | {type:'editCard',c} | {type:'sell',c} | {type:'unsell',c}
-  //              'addPrize' | {type:'editPrize',p}
 
   const held = sorareCards.filter(c => c.status === 'held')
   const sold = sorareCards.filter(c => c.status === 'sold')
 
-  const totalInvested  = sorareCards.reduce((s, c) => s + c.buyPrice, 0)
-  const totalSoldFor   = sold.reduce((s, c) => s + (c.sellPrice || 0), 0)
+  const totalInvested = sorareCards.reduce((s, c) => s + c.buyPrice, 0)
+  const totalSoldFor = sold.reduce((s, c) => s + (c.sellPrice || 0), 0)
   const totalPrizesEth = sorarePrizes.reduce((s, p) => s + p.ethAmount, 0)
   const totalPrizesEur = sorarePrizes.reduce((s, p) => s + (p.euroValue || 0), 0)
-  const heldValue      = held.reduce((s, c) => s + c.buyPrice, 0)
-  const netResult      = totalSoldFor + totalPrizesEur - totalInvested
+  const heldValue = held.reduce((s, c) => s + c.buyPrice, 0)
+  const netResult = totalSoldFor + totalPrizesEur - totalInvested
 
-  const filteredHeld = filterRarity === 'all' ? held : held.filter(c => c.rarity === filterRarity)
-  const filteredSold = filterRarity === 'all' ? sold : sold.filter(c => c.rarity === filterRarity)
+  const sortedMoves = [...sorareBalanceMoves].reverse()
 
   return (
     <div className="page">
@@ -320,15 +499,10 @@ export default function Sorare() {
         </div>
       </div>
 
-      {/* Carteras Cash / ETH */}
       <div className="card" style={{ marginBottom: 12, borderLeft: '3px solid var(--accent)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <span style={{ fontFamily: 'var(--font-head)', fontWeight: 600, fontSize: 13 }}>Carteras Sorare</span>
-          <button
-            className="btn btn-primary"
-            style={{ padding: '6px 12px', fontSize: 11, background: 'var(--green)' }}
-            onClick={() => setModal('addFunds')}
-          >
+          <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: 11, background: 'var(--green)' }} onClick={() => setModal('addFunds')}>
             + Añadir fondos
           </button>
         </div>
@@ -336,37 +510,14 @@ export default function Sorare() {
           <div style={{ background: 'rgba(34,168,90,0.08)', borderRadius: 8, padding: '10px 12px' }}>
             <div style={{ color: 'var(--text3)', fontSize: 10, marginBottom: 2 }}>CASH (€)</div>
             <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--green)' }}>{fmt(cashBalance)}€</div>
-            <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>Para comprar cartas</div>
           </div>
           <div style={{ background: 'rgba(10,138,173,0.08)', borderRadius: 8, padding: '10px 12px' }}>
             <div style={{ color: 'var(--text3)', fontSize: 10, marginBottom: 2 }}>ETH</div>
             <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--blue)' }}>{ethBalance.toFixed(4)} ETH</div>
-            <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>Premios y wallet</div>
           </div>
         </div>
-        <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 10, lineHeight: 1.45 }}>
-          Pulsa <strong>+ Añadir fondos</strong> cuando deposites € en Sorare o recibas ETH. Los premios de ligas también puedes registrarlos con <strong>+ Premio</strong>.
-        </p>
-        {sorareBalanceMoves.length > 0 && (
-          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
-            <div style={{ fontSize: 10, color: 'var(--text3)', marginBottom: 6, fontWeight: 600 }}>ÚLTIMOS MOVIMIENTOS</div>
-            {[...sorareBalanceMoves].reverse().slice(0, 3).map(m => (
-              <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
-                <span style={{ color: 'var(--text2)' }}>
-                  {m.type === 'deposit' ? '+' : '−'}
-                  {m.wallet === 'cash' ? `${fmt(m.amount)}€` : `${m.amount} ETH`}
-                  {m.note ? ` · ${m.note}` : ''}
-                </span>
-                <span style={{ color: 'var(--text3)' }}>
-                  {format(new Date(m.date), 'd MMM', { locale: es })}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
-      {/* Balance */}
       <div className="card" style={{ marginBottom: 12, borderLeft: `3px solid ${netResult >= 0 ? 'var(--green)' : 'var(--red)'}` }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
           <div>
@@ -394,130 +545,132 @@ export default function Sorare() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 7, marginBottom: 12 }}>
-        {[['cartera', `Cartera (${held.length})`], ['vendidas', `Vendidas (${sold.length})`], ['premios', `Premios (${sorarePrizes.length})`]].map(([v, l]) => (
-          <button key={v} onClick={() => setTab(v)} style={{
-            padding: '5px 13px', borderRadius: 20, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
-            background: tab === v ? 'var(--accent)' : 'var(--bg3)',
-            color: tab === v ? '#fff' : 'var(--text2)',
-            border: '1px solid ' + (tab === v ? 'var(--accent)' : 'var(--border)'),
-          }}>
-            {l}
-          </button>
-        ))}
+      <div className="scroll-x" style={{ marginBottom: 12 }}>
+        <div style={{ display: 'flex', gap: 7, width: 'max-content' }}>
+          {[
+            ['cartera', `Galería (${held.length})`],
+            ['vendidas', `Vendidas (${sold.length})`],
+            ['movimientos', `Movimientos (${sorareBalanceMoves.length})`],
+            ['premios', `Premios (${sorarePrizes.length})`],
+          ].map(([v, l]) => (
+            <button key={v} onClick={() => setTab(v)} style={{
+              padding: '5px 13px', borderRadius: 20, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
+              background: tab === v ? 'var(--accent)' : 'var(--bg3)',
+              color: tab === v ? '#fff' : 'var(--text2)',
+              border: '1px solid ' + (tab === v ? 'var(--accent)' : 'var(--border)'),
+            }}>
+              {l}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Rarity filter */}
-      {tab !== 'premios' && (
-        <div className="scroll-x" style={{ marginBottom: 12 }}>
-          <div style={{ display: 'flex', gap: 6, width: 'max-content' }}>
-            <button onClick={() => setFilterRarity('all')} style={{ padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: filterRarity === 'all' ? 'var(--bg2)' : 'transparent', color: filterRarity === 'all' ? 'var(--text)' : 'var(--text3)', border: '1px solid ' + (filterRarity === 'all' ? 'var(--border2)' : 'var(--border)') }}>
-              Todas
-            </button>
-            {SORARE_RARITIES.map(r => (
-              <button key={r} onClick={() => setFilterRarity(r)} style={{ padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: filterRarity === r ? RARITY_STYLE[r].bg : 'transparent', color: filterRarity === r ? RARITY_STYLE[r].c : 'var(--text3)', border: '1px solid ' + (filterRarity === r ? RARITY_STYLE[r].c : 'var(--border)') }}>
-                {RARITY_LABELS[r]}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Cartera */}
       {tab === 'cartera' && (
-        <>
-          {filteredHeld.length === 0 && (
-            <div className="card" style={{ textAlign: 'center', padding: '32px 14px' }}>
-              <div style={{ fontSize: 26, marginBottom: 8 }}>⚽</div>
-              <div style={{ color: 'var(--text3)', fontSize: 13 }}>Sin cartas en cartera.</div>
-            </div>
-          )}
-          {filteredHeld.map(card => (
-            <div key={card.id} className="card" style={{ marginBottom: 10, borderLeft: `3px solid ${RARITY_STYLE[card.rarity]?.c || 'var(--border)'}` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: 'var(--font-head)', fontWeight: 700, fontSize: 15 }}>{card.player}</div>
-                  <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, marginTop: 4, background: RARITY_STYLE[card.rarity]?.bg, color: RARITY_STYLE[card.rarity]?.c }}>
-                    {RARITY_LABELS[card.rarity]}
-                  </span>
-                  {card.purchaseDate && (
-                    <div style={{ color: 'var(--text3)', fontSize: 11, marginTop: 4 }}>
-                      Comprada: {format(new Date(card.purchaseDate), 'd MMM yyyy', { locale: es })}
-                    </div>
-                  )}
-                  {card.competitions?.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
-                      {card.competitions.map(c => (
-                        <span key={c} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, background: 'var(--bg3)', color: 'var(--text2)' }}>{c}</span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--red)' }}>{fmt(card.buyPrice)}€</div>
-                  <div style={{ fontSize: 10, color: 'var(--text3)', marginBottom: 8 }}>compra</div>
-                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                    <button className="btn btn-ghost" style={{ padding: '4px 9px', fontSize: 11, color: 'var(--green)', borderColor: '#1e9e5640' }}
-                      onClick={() => setModal({ type: 'sell', c: card })}>Vender</button>
-                    <button className="btn btn-ghost" style={{ padding: '4px 9px', fontSize: 11 }}
-                      onClick={() => setModal({ type: 'editCard', c: card })}>✏️</button>
-                    <button onClick={() => deleteSorareCard(card.id)} style={{ fontSize: 11, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 2px' }}>✕</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </>
+        <RarityGallery
+          cards={held}
+          emptyIcon="⚽"
+          emptyText="Sin cartas en cartera."
+          onSell={(c) => setModal({ type: 'sell', c })}
+          onEdit={(c) => setModal({ type: 'editCard', c })}
+          onDelete={(id) => deleteSorareCard(id)}
+        />
       )}
 
-      {/* Vendidas */}
       {tab === 'vendidas' && (
         <>
-          {filteredSold.length === 0 && (
+          {sold.length === 0 ? (
             <div className="card" style={{ textAlign: 'center', padding: '32px 14px' }}>
               <div style={{ fontSize: 26, marginBottom: 8 }}>💰</div>
               <div style={{ color: 'var(--text3)', fontSize: 13 }}>Sin cartas vendidas.</div>
             </div>
-          )}
-          {filteredSold.map(card => {
-            const profit = (card.sellPrice || 0) - card.buyPrice
-            return (
-              <div key={card.id} className="card" style={{ marginBottom: 10 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <div style={{ fontFamily: 'var(--font-head)', fontWeight: 700, fontSize: 15 }}>{card.player}</div>
-                    <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, marginTop: 4, background: RARITY_STYLE[card.rarity]?.bg, color: RARITY_STYLE[card.rarity]?.c }}>
-                      {RARITY_LABELS[card.rarity]}
+          ) : (
+            SORARE_RARITIES.map(rarity => {
+              const items = sold.filter(c => c.rarity === rarity)
+              if (items.length === 0) return null
+              return (
+                <section key={rarity} style={{ marginBottom: 18 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, paddingBottom: 6, borderBottom: `2px solid ${RARITY_STYLE[rarity].c}` }}>
+                    <span style={{ padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: RARITY_STYLE[rarity].bg, color: RARITY_STYLE[rarity].c }}>
+                      {RARITY_LABELS[rarity]}
                     </span>
-                    {card.sellDate && (
-                      <div style={{ color: 'var(--text3)', fontSize: 11, marginTop: 4 }}>
-                        Vendida: {format(new Date(card.sellDate), 'd MMM yyyy', { locale: es })}
+                  </div>
+                  {items.map(card => {
+                    const profit = (card.sellPrice || 0) - card.buyPrice
+                    return (
+                      <div key={card.id} className="card" style={{ marginBottom: 10, borderLeft: `3px solid ${RARITY_STYLE[rarity].c}` }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div>
+                            <div style={{ fontFamily: 'var(--font-head)', fontWeight: 700, fontSize: 15 }}>{card.player}</div>
+                            {card.paymentMethod && (
+                              <span style={{ fontSize: 10, color: 'var(--text3)' }}>{SORARE_PAYMENT_LABELS[card.paymentMethod]}</span>
+                            )}
+                            {card.sellDate && (
+                              <div style={{ color: 'var(--text3)', fontSize: 11, marginTop: 4 }}>
+                                Vendida: {format(new Date(card.sellDate), 'd MMM yyyy', { locale: es })}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: 13, color: 'var(--text2)' }}>{fmt(card.buyPrice)}€ → {fmt(card.sellPrice || 0)}€</div>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: profit >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                              {profit >= 0 ? '+' : ''}{fmt(profit)}€
+                            </div>
+                            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 6 }}>
+                              <button className="btn btn-ghost" style={{ padding: '4px 9px', fontSize: 11 }} onClick={() => setModal({ type: 'sell', c: card })}>✏️ Editar venta</button>
+                              <button className="btn btn-ghost" style={{ padding: '4px 9px', fontSize: 11, color: 'var(--orange)' }}
+                                onClick={() => updateSorareCard(card.id, { status: 'held', sellPrice: null, sellDate: null })}>
+                                Devolver
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 13, color: 'var(--text2)' }}>{fmt(card.buyPrice)}€ → {fmt(card.sellPrice || 0)}€</div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: profit >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                      {profit >= 0 ? '+' : ''}{fmt(profit)}€
-                    </div>
-                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 6 }}>
-                      <button className="btn btn-ghost" style={{ padding: '4px 9px', fontSize: 11 }}
-                        onClick={() => setModal({ type: 'sell', c: card })}>✏️ Editar venta</button>
-                      <button className="btn btn-ghost" style={{ padding: '4px 9px', fontSize: 11, color: 'var(--orange)' }}
-                        onClick={() => { updateSorareCard(card.id, { status: 'held', sellPrice: null, sellDate: null }) }}>
-                        Devolver
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
+                    )
+                  })}
+                </section>
+              )
+            })
+          )}
         </>
       )}
 
-      {/* Premios */}
+      {tab === 'movimientos' && (
+        <>
+          {sortedMoves.length === 0 ? (
+            <div className="card" style={{ textAlign: 'center', padding: '32px 14px' }}>
+              <div style={{ fontSize: 26, marginBottom: 8 }}>📋</div>
+              <div style={{ color: 'var(--text3)', fontSize: 13 }}>Sin movimientos. Añade fondos, cartas o premios.</div>
+            </div>
+          ) : (
+            sortedMoves.map(m => {
+              const isIn = m.type === 'deposit'
+              const cat = m.category || 'manual'
+              return (
+                <div key={m.id} className="card" style={{ marginBottom: 8, borderLeft: `3px solid ${isIn ? 'var(--green)' : 'var(--red)'}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>
+                        {MOVE_CATEGORY_LABELS[cat] || cat}
+                        {m.player && <span style={{ fontWeight: 400, color: 'var(--text2)' }}> · {m.player}</span>}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
+                        {formatMoveWallet(m)} · {format(new Date(m.date), 'd MMM yyyy, HH:mm', { locale: es })}
+                      </div>
+                      {m.note && <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 4 }}>{m.note}</div>}
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 10 }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: isIn ? 'var(--green)' : 'var(--red)' }}>
+                        {isIn ? '+' : '−'}{formatMoveAmount(m)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </>
+      )}
+
       {tab === 'premios' && (
         <>
           {sorarePrizes.length > 0 && (
@@ -563,12 +716,12 @@ export default function Sorare() {
         </>
       )}
 
-      {modal === 'addFunds'         && <FundModal onClose={() => setModal(null)} />}
-      {modal === 'addCard'          && <CardModal  card={null}    onClose={() => setModal(null)} />}
-      {modal?.type === 'editCard'   && <CardModal  card={modal.c} onClose={() => setModal(null)} />}
-      {modal?.type === 'sell'       && <SellModal  card={modal.c} onClose={() => setModal(null)} />}
-      {modal === 'addPrize'         && <PrizeModal prize={null}   onClose={() => setModal(null)} />}
-      {modal?.type === 'editPrize'  && <PrizeModal prize={modal.p} onClose={() => setModal(null)} />}
+      {modal === 'addFunds' && <FundModal onClose={() => setModal(null)} />}
+      {modal === 'addCard' && <CardModal card={null} onClose={() => setModal(null)} />}
+      {modal?.type === 'editCard' && <CardModal card={modal.c} onClose={() => setModal(null)} />}
+      {modal?.type === 'sell' && <SellModal card={modal.c} onClose={() => setModal(null)} />}
+      {modal === 'addPrize' && <PrizeModal prize={null} onClose={() => setModal(null)} />}
+      {modal?.type === 'editPrize' && <PrizeModal prize={modal.p} onClose={() => setModal(null)} />}
     </div>
   )
 }

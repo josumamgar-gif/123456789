@@ -86,10 +86,84 @@ export function AppProvider({ children }) {
     setGoals(prev => prev.filter(g => g.id !== id))
   }
 
+  const newMoveId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+
+  const applyWalletDelta = (wallet, delta) => {
+    if (!['cash', 'eth'].includes(wallet)) return
+    setSorareBalances(prev => ({
+      cash: prev?.cash ?? 0,
+      eth: prev?.eth ?? 0,
+      [wallet]: Math.max(0, (prev?.[wallet] ?? 0) + delta),
+    }))
+  }
+
+  const recordSorareMove = (move) => {
+    setSorareBalanceMoves(prev => [...prev, {
+      id: newMoveId(),
+      date: new Date().toISOString(),
+      category: 'manual',
+      ...move,
+    }])
+  }
+
+  const reverseCardPurchase = (card) => {
+    if (!card?.paymentMethod || card.paymentMethod === 'apple_pay') return
+    const price = parseFloat(card.buyPrice) || 0
+    if (card.paymentMethod === 'cash' && price > 0) {
+      applyWalletDelta('cash', price)
+    }
+    if (card.paymentMethod === 'eth') {
+      const eth = parseFloat(card.buyEthAmount) || 0
+      if (eth > 0) applyWalletDelta('eth', eth)
+    }
+  }
+
   const addSorareCard = (card) => {
+    const id = Date.now().toString()
+    const price = parseFloat(card.buyPrice) || 0
+    const ethSpent = parseFloat(card.buyEthAmount) || 0
+    const { paymentMethod, player } = card
+
+    if (paymentMethod === 'cash' && price > 0) {
+      applyWalletDelta('cash', -price)
+      recordSorareMove({
+        category: 'card_buy',
+        type: 'withdraw',
+        wallet: 'cash',
+        amount: price,
+        paymentMethod: 'cash',
+        cardId: id,
+        player,
+        note: `Compra: ${player}`,
+      })
+    } else if (paymentMethod === 'eth' && ethSpent > 0) {
+      applyWalletDelta('eth', -ethSpent)
+      recordSorareMove({
+        category: 'card_buy',
+        type: 'withdraw',
+        wallet: 'eth',
+        amount: ethSpent,
+        paymentMethod: 'eth',
+        cardId: id,
+        player,
+        note: `Compra ETH: ${player}${price ? ` (${price}€)` : ''}`,
+      })
+    } else if (paymentMethod === 'apple_pay' && price > 0) {
+      recordSorareMove({
+        category: 'card_buy',
+        type: 'withdraw',
+        wallet: 'apple_pay',
+        amount: price,
+        paymentMethod: 'apple_pay',
+        cardId: id,
+        player,
+        note: `Apple Pay: ${player}`,
+      })
+    }
+
     setSorareCards(prev => [...prev, {
       ...card,
-      id: Date.now().toString(),
+      id,
       purchaseDate: new Date().toISOString(),
       status: 'held',
     }])
@@ -99,11 +173,46 @@ export function AppProvider({ children }) {
     setSorareCards(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c))
   }
 
+  const sellSorareCard = (id, sellPrice, creditToCash = true) => {
+    const price = parseFloat(sellPrice) || 0
+    const card = sorareCards.find(c => c.id === id)
+    updateSorareCard(id, {
+      status: 'sold',
+      sellPrice: price,
+      sellDate: new Date().toISOString(),
+    })
+    if (creditToCash && price > 0) {
+      applyWalletDelta('cash', price)
+      recordSorareMove({
+        category: 'card_sell',
+        type: 'deposit',
+        wallet: 'cash',
+        amount: price,
+        cardId: id,
+        player: card?.player,
+        note: `Venta: ${card?.player || 'Carta'}`,
+      })
+    }
+  }
+
   const deleteSorareCard = (id) => {
+    const card = sorareCards.find(c => c.id === id)
+    if (card) reverseCardPurchase(card)
     setSorareCards(prev => prev.filter(c => c.id !== id))
   }
 
   const addSorarePrize = (prize) => {
+    const eth = parseFloat(prize.ethAmount) || 0
+    if (eth > 0) {
+      applyWalletDelta('eth', eth)
+      recordSorareMove({
+        category: 'prize',
+        type: 'deposit',
+        wallet: 'eth',
+        amount: eth,
+        note: prize.description || 'Premio liga',
+      })
+    }
     setSorarePrizes(prev => [...prev, { ...prize, id: Date.now().toString(), date: new Date().toISOString() }])
   }
 
@@ -111,19 +220,14 @@ export function AppProvider({ children }) {
     const amt = parseFloat(amount)
     if (!amt || amt <= 0 || !['cash', 'eth'].includes(wallet)) return false
     const delta = type === 'withdraw' ? -amt : amt
-    setSorareBalances(prev => {
-      const current = prev?.[wallet] ?? 0
-      const next = Math.max(0, current + delta)
-      return { cash: prev?.cash ?? 0, eth: prev?.eth ?? 0, [wallet]: next }
-    })
-    setSorareBalanceMoves(prev => [...prev, {
-      id: Date.now().toString(),
+    applyWalletDelta(wallet, delta)
+    recordSorareMove({
+      category: 'manual',
       wallet,
       amount: amt,
       type,
       note,
-      date: new Date().toISOString(),
-    }])
+    })
     return true
   }
 
@@ -138,7 +242,7 @@ export function AppProvider({ children }) {
       transactions, addTransaction, deleteTransaction,
       extraIncome, setExtraIncome,
       goals, addGoal, updateGoal, deleteGoal,
-      sorareCards, addSorareCard, updateSorareCard, deleteSorareCard,
+      sorareCards, addSorareCard, updateSorareCard, sellSorareCard, deleteSorareCard,
       sorarePrizes, addSorarePrize, setSorarePrizes,
       sorareCompetitions, setSorareCompetitions,
       sorareBalances, setSorareBalances,
