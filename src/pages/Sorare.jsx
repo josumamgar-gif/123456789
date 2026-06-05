@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import {
   SORARE_COMPETITIONS,
@@ -470,11 +470,40 @@ export default function Sorare() {
     sorareCards, deleteSorareCard, updateSorareCard, sellSorareCard,
     sorarePrizes, setSorarePrizes,
     sorareBalances, sorareBalanceMoves,
+    cryptoPrices, setCryptoPrices,
   } = useApp()
   const cashBalance = sorareBalances?.cash ?? 0
   const ethBalance = sorareBalances?.eth ?? 0
   const [tab, setTab] = useState('cartera')
   const [modal, setModal] = useState(null)
+  const [ethPriceLoading, setEthPriceLoading] = useState(false)
+
+  const ethPriceEur = cryptoPrices?.ethereum ?? null
+  const ethValueEur = ethPriceEur != null ? ethBalance * ethPriceEur : null
+  const walletTotalEur = cashBalance + (ethValueEur ?? 0)
+
+  useEffect(() => {
+    const updatedAt = cryptoPrices?.updatedAt ? new Date(cryptoPrices.updatedAt).getTime() : 0
+    const hasFreshPrice = cryptoPrices?.ethereum && Date.now() - updatedAt < 60 * 60 * 1000
+    if (hasFreshPrice) return
+
+    let active = true
+    setEthPriceLoading(true)
+    fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=eur')
+      .then(res => res.json())
+      .then(data => {
+        if (active && data?.ethereum?.eur) {
+          setCryptoPrices(prev => ({
+            ...prev,
+            ethereum: data.ethereum.eur,
+            updatedAt: new Date().toISOString(),
+          }))
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (active) setEthPriceLoading(false) })
+    return () => { active = false }
+  }, [cryptoPrices?.ethereum, cryptoPrices?.updatedAt, setCryptoPrices])
 
   const held = sorareCards.filter(c => c.status === 'held')
   const sold = sorareCards.filter(c => c.status === 'sold')
@@ -483,7 +512,6 @@ export default function Sorare() {
   const totalSoldFor = sold.reduce((s, c) => s + (c.sellPrice || 0), 0)
   const totalPrizesEth = sorarePrizes.reduce((s, p) => s + p.ethAmount, 0)
   const totalPrizesEur = sorarePrizes.reduce((s, p) => s + (p.euroValue || 0), 0)
-  const heldValue = held.reduce((s, c) => s + c.buyPrice, 0)
   const netResult = totalSoldFor + totalPrizesEur - totalInvested
 
   const sortedMoves = [...sorareBalanceMoves].reverse()
@@ -514,6 +542,12 @@ export default function Sorare() {
           <div style={{ background: 'rgba(10,138,173,0.08)', borderRadius: 8, padding: '10px 12px' }}>
             <div style={{ color: 'var(--text3)', fontSize: 10, marginBottom: 2 }}>ETH</div>
             <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--blue)' }}>{ethBalance.toFixed(4)} ETH</div>
+            {ethValueEur != null && ethBalance > 0 && (
+              <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 3 }}>≈ {fmt(ethValueEur)}€</div>
+            )}
+            {ethBalance > 0 && ethValueEur == null && (
+              <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 3 }}>{ethPriceLoading ? 'Calculando €…' : 'Sin precio ETH'}</div>
+            )}
           </div>
         </div>
       </div>
@@ -533,8 +567,13 @@ export default function Sorare() {
             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--blue)' }}>{totalPrizesEth.toFixed(4)} ETH</div>
           </div>
           <div>
-            <div style={{ color: 'var(--text3)', fontSize: 10, marginBottom: 2 }}>CARTERA ACTUAL</div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--accent)' }}>{fmt(heldValue)}€</div>
+            <div style={{ color: 'var(--text3)', fontSize: 10, marginBottom: 2 }}>SALDO CARTERAS</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--accent)' }}>{fmt(walletTotalEur)}€</div>
+            {(cashBalance > 0 || ethBalance > 0) && (
+              <div style={{ fontSize: 9, color: 'var(--text3)', marginTop: 2 }}>
+                {fmt(cashBalance)}€ cash{ethValueEur != null && ethBalance > 0 ? ` + ${fmt(ethValueEur)}€ eth` : ''}
+              </div>
+            )}
           </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, borderTop: '1px solid var(--border)' }}>
