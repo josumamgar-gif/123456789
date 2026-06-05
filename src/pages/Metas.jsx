@@ -139,7 +139,9 @@ export default function Metas() {
     <div className="page">
       <div className="page-header">
         <h1 className="page-title">Metas</h1>
-        <button className="btn btn-primary" style={{ padding: '7px 13px', fontSize: 13 }} onClick={() => setModal('add')}>+ Nueva</button>
+        <div className="page-header-actions page-header-actions--1">
+          <button className="btn btn-primary" onClick={() => setModal('add')}>+ Nueva meta</button>
+        </div>
       </div>
 
       {/* Summary */}

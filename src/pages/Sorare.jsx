@@ -128,7 +128,7 @@ function CardModal({ card, onClose }) {
       {!isEdit && (
         <div className="form-group">
           <label className="form-label">Pagado con</label>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 6 }}>
             {SORARE_PAYMENT_METHODS.map(pm => (
               <button key={pm} onClick={() => setPaymentMethod(pm)} style={{
                 padding: '8px 4px', borderRadius: 8, fontSize: 10, fontWeight: 700, border: '1px solid',
@@ -492,17 +492,17 @@ export default function Sorare() {
     <div className="page">
       <div className="page-header">
         <h1 className="page-title">Sorare</h1>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          <button className="btn btn-ghost" style={{ padding: '7px 11px', fontSize: 11 }} onClick={() => setModal('addFunds')}>+ Fondos</button>
-          <button className="btn btn-ghost" style={{ padding: '7px 11px', fontSize: 11 }} onClick={() => setModal('addPrize')}>+ Premio</button>
-          <button className="btn btn-primary" style={{ padding: '7px 13px', fontSize: 13 }} onClick={() => setModal('addCard')}>+ Carta</button>
+        <div className="page-header-actions page-header-actions--3">
+          <button className="btn btn-ghost" onClick={() => setModal('addFunds')}>+ Fondos</button>
+          <button className="btn btn-ghost" onClick={() => setModal('addPrize')}>+ Premio</button>
+          <button className="btn btn-primary" onClick={() => setModal('addCard')}>+ Carta</button>
         </div>
       </div>
 
       <div className="card" style={{ marginBottom: 12, borderLeft: '3px solid var(--accent)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <div className="card-header-row">
           <span style={{ fontFamily: 'var(--font-head)', fontWeight: 600, fontSize: 13 }}>Carteras Sorare</span>
-          <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: 11, background: 'var(--green)' }} onClick={() => setModal('addFunds')}>
+          <button className="btn btn-primary" style={{ background: 'var(--green)' }} onClick={() => setModal('addFunds')}>
             + Añadir fondos
           </button>
         </div>
@@ -545,24 +545,23 @@ export default function Sorare() {
         </div>
       </div>
 
-      <div className="scroll-x" style={{ marginBottom: 12 }}>
-        <div style={{ display: 'flex', gap: 7, width: 'max-content' }}>
-          {[
-            ['cartera', `Galería (${held.length})`],
-            ['vendidas', `Vendidas (${sold.length})`],
-            ['movimientos', `Movimientos (${sorareBalanceMoves.length})`],
-            ['premios', `Premios (${sorarePrizes.length})`],
-          ].map(([v, l]) => (
-            <button key={v} onClick={() => setTab(v)} style={{
-              padding: '5px 13px', borderRadius: 20, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
-              background: tab === v ? 'var(--accent)' : 'var(--bg3)',
-              color: tab === v ? '#fff' : 'var(--text2)',
-              border: '1px solid ' + (tab === v ? 'var(--accent)' : 'var(--border)'),
-            }}>
-              {l}
-            </button>
-          ))}
-        </div>
+      <div className="tab-list-vertical">
+        {[
+          ['cartera', 'Galería', held.length],
+          ['vendidas', 'Vendidas', sold.length],
+          ['movimientos', 'Movimientos', sorareBalanceMoves.length],
+          ['premios', 'Premios', sorarePrizes.length],
+        ].map(([v, label, count]) => (
+          <button
+            key={v}
+            type="button"
+            className={`tab-btn ${tab === v ? 'active' : ''}`}
+            onClick={() => setTab(v)}
+          >
+            <span>{label}</span>
+            <span className="tab-count">{count}</span>
+          </button>
+        ))}
       </div>
 
       {tab === 'cartera' && (

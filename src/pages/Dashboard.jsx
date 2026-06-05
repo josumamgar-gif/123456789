@@ -92,15 +92,15 @@ function CryptoCard() {
 
   return (
     <div className="card" style={{ marginBottom: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+      <div className="card-header-row">
         <span className="section-title" style={{ margin: 0 }}>Cripto</span>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="page-header-actions page-header-actions--2">
           {crypto.length > 0 && (
-            <button className="btn btn-ghost" style={{ padding: '5px 10px', fontSize: 11 }} onClick={fetchPrices} disabled={loading}>
+            <button className="btn btn-ghost btn-sm" onClick={fetchPrices} disabled={loading}>
               {loading ? '…' : '↻ Precios'}
             </button>
           )}
-          <button className="btn btn-ghost" style={{ padding: '5px 10px', fontSize: 11 }} onClick={() => setModal('add')}>+ Añadir</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => setModal('add')}>+ Añadir</button>
         </div>
       </div>
 
@@ -242,9 +242,9 @@ export default function Dashboard() {
 
   return (
     <div className="page">
-      <div className="page-header">
+      <div className="page-header page-header--row">
         <h1 className="page-title">Patrimonio</h1>
-        <span style={{ color: 'var(--text3)', fontSize: 12 }}>
+        <span className="page-header-meta">
           {now.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
         </span>
       </div>
@@ -273,6 +273,7 @@ export default function Dashboard() {
       {pieData.length > 0 ? (
         <div className="card" style={{ marginBottom: 12 }}>
           <span className="section-title">Gasto este mes por categoría</span>
+          <div className="chart-wrap">
           <ResponsiveContainer width="100%" height={170}>
             <PieChart>
               <Pie data={pieData} cx="50%" cy="50%" innerRadius={48} outerRadius={74} dataKey="value" paddingAngle={2}>
@@ -281,6 +282,7 @@ export default function Dashboard() {
               <Tooltip formatter={v => `${fmt(v)}€`} contentStyle={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
             </PieChart>
           </ResponsiveContainer>
+          </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {pieData.map((d, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>

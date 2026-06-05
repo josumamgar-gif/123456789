@@ -1,8 +1,14 @@
 # Patrimonio — App de gestión personal
 
-**Versión 1.1**
+**Versión 1.2**
 
 App móvil-first para gestión de patrimonio personal. React + Vite, datos en localStorage.
+
+### Novedades v1.2 (móvil iPhone)
+- Sin scroll horizontal ni zoom al usar inputs
+- Cabeceras apiladas y botones en grid en todas las páginas
+- Sorare: pestañas en lista vertical
+- Safe areas, PWA y optimización para pantalla completa del iPhone
 
 ### Novedades v1.1 (Sorare)
 - Carteras Cash y ETH con botón para añadir fondos

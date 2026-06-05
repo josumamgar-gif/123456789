@@ -272,9 +272,11 @@ export default function Resumen() {
       {/* Header */}
       <div className="page-header">
         <h1 className="page-title">Nómina</h1>
-        <button className="btn btn-ghost" style={{ padding: '7px 12px', fontSize: 12 }} onClick={() => setModal('income')}>
-          ✏️ {fmt(income)}€
-        </button>
+        <div className="page-header-actions page-header-actions--1">
+          <button className="btn btn-ghost" onClick={() => setModal('income')}>
+            ✏️ Nómina: {fmt(income)}€
+          </button>
+        </div>
       </div>
 
       {/* Reparto */}
@@ -382,6 +384,7 @@ export default function Resumen() {
       {/* Histórico */}
       <div className="card" style={{ marginBottom: 12 }}>
         <span className="section-title">Gasto últimos 6 meses</span>
+        <div className="chart-wrap">
         <ResponsiveContainer width="100%" height={150}>
           <BarChart data={historyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
             <XAxis dataKey="month" tick={{ fill: 'var(--text3)', fontSize: 11 }} axisLine={false} tickLine={false} />
@@ -394,6 +397,7 @@ export default function Resumen() {
             </Bar>
           </BarChart>
         </ResponsiveContainer>
+        </div>
       </div>
 
       {/* Modals */}

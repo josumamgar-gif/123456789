@@ -12,7 +12,7 @@ export default function App() {
   return (
     <AppProvider>
       <BrowserRouter>
-        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
+        <div className="app-shell">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/gastos" element={<Gastos />} />

@@ -143,9 +143,9 @@ export default function Gastos() {
     <div className="page">
       <div className="page-header">
         <h1 className="page-title">Gastos</h1>
-        <div style={{ display: 'flex', gap: 7 }}>
-          <button className="btn btn-ghost" style={{ padding: '7px 11px', fontSize: 11 }} onClick={() => setModal('cats')}>Categorías</button>
-          <button className="btn btn-primary" style={{ padding: '7px 13px', fontSize: 13 }} onClick={() => setModal('addTx')}>+ Añadir</button>
+        <div className="page-header-actions page-header-actions--2">
+          <button className="btn btn-ghost" onClick={() => setModal('cats')}>Categorías</button>
+          <button className="btn btn-primary" onClick={() => setModal('addTx')}>+ Añadir</button>
         </div>
       </div>
 
