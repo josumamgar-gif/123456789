@@ -238,7 +238,7 @@ function SellModal({ card, onClose }) {
       </div>
       <div className="form-group">
         <label className="form-label">Precio de venta (€)</label>
-        <input className="form-input" type="number" min="0" step="0.01" placeholder="0.00" value={sellPrice} onChange={e => setSellPrice(e.target.value)} autoFocus />
+        <input className="form-input" type="number" min="0" step="0.01" placeholder="0.00" value={sellPrice} onChange={e => setSellPrice(e.target.value)} />
       </div>
       {!isEdit && (
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text2)', marginBottom: 14, cursor: 'pointer' }}>
@@ -304,7 +304,7 @@ function FundModal({ onClose }) {
       </div>
       <div className="form-group">
         <label className="form-label">{wallet === 'cash' ? 'Cantidad (€)' : 'Cantidad (ETH)'}</label>
-        <input className="form-input" type="number" min="0" step={wallet === 'cash' ? '0.01' : '0.0001'} placeholder={wallet === 'cash' ? '0.00' : '0.0000'} value={amount} onChange={e => setAmount(e.target.value)} autoFocus />
+        <input className="form-input" type="number" min="0" step={wallet === 'cash' ? '0.01' : '0.0001'} placeholder={wallet === 'cash' ? '0.00' : '0.0000'} value={amount} onChange={e => setAmount(e.target.value)} />
       </div>
       <div className="form-group">
         <label className="form-label">Nota (opcional)</label>

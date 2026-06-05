@@ -179,7 +179,7 @@ function AmortizeModal({ debt, onClose }) {
       </div>
       <div className="form-group">
         <label className="form-label">Amortización extra (€)</label>
-        <input className="form-input" type="number" step="0.01" placeholder="0.00" value={extra} onChange={e => setExtra(e.target.value)} autoFocus />
+        <input className="form-input" type="number" step="0.01" placeholder="0.00" value={extra} onChange={e => setExtra(e.target.value)} />
       </div>
       <div style={{ display: 'flex', gap: 10 }}>
         <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>Cancelar</button>
