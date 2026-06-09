@@ -309,13 +309,13 @@ export default function Resumen() {
 
   const handleCloseMonth = () => {
     const label = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)
-    if (!window.confirm(`¿Cerrar ${label}?\n\nSe guardará el resumen con tus gastos y el dinero que te quedó. Los apuntes del mes se limpiarán para empezar el siguiente.`)) return
+    if (!window.confirm(`¿Cerrar ${label}?\n\nSe guardará el resumen con tus gastos y el dinero que te quedó. El mes siguiente empezará en 0€ hasta que cobres la nómina y añadas efectivo.`)) return
     closeMonth(currentYear, currentMonthNum)
   }
 
   const handleStartFresh = () => {
-    if (!window.confirm('¿Empezar el mes actual limpio?\n\nSe borrarán los apuntes y movimientos de banco/efectivo de este mes. Los saldos configurados se mantienen.')) return
-    startFreshMonth({ resetBalances: false })
+    if (!window.confirm('¿Empezar el mes actual limpio?\n\nSe borrarán apuntes y movimientos. Banco y efectivo volverán a 0€.')) return
+    startFreshMonth()
   }
 
   const fixedTotal = fixedExpenses.filter(e => e.active).reduce((s, e) => s + e.amount, 0)
@@ -494,11 +494,9 @@ export default function Resumen() {
         </div>
         <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: '10px 12px', marginBottom: 12, fontSize: 12 }}>
           Dinero ahora: <strong style={{ color: 'var(--blue)' }}>{fmt(currentLiquid)}€</strong>
-          {(bankBalance != null || cashOnHand != null) && (
-            <span style={{ color: 'var(--text3)' }}>
-              {' '}({bankBalance != null ? `${fmt(bankBalance)}€ banco` : ''}{bankBalance != null && cashOnHand != null ? ' + ' : ''}{cashOnHand != null ? `${fmt(cashOnHand)}€ efectivo` : ''})
-            </span>
-          )}
+          <span style={{ color: 'var(--text3)' }}>
+            {' '}({fmt(bankBalance ?? 0)}€ banco + {fmt(cashOnHand ?? 0)}€ efectivo)
+          </span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={handleCloseMonth}>

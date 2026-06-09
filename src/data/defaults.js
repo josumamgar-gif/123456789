@@ -120,6 +120,8 @@ export const WALLET_MOVE_LABELS = {
   manual: 'Ajuste manual',
   sorare: 'Sorare',
   balance_set: 'Fijar saldo',
+  paycheck: 'Nómina',
+  cash_in: 'Efectivo',
 }
 
 export const INVESTMENT_RECS = [

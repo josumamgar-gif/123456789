@@ -187,8 +187,34 @@ function ViviendaCard() {
 }
 
 const WALLET_META = {
-  bank: { label: 'Banco', color: 'var(--blue)', setup: 'Indica el saldo real de tu cuenta. Los apuntes pagados con banco se descontarán de aquí.' },
-  cash: { label: 'Efectivo', color: 'var(--orange)', setup: 'Indica cuánto efectivo llevas encima. Los apuntes pagados en efectivo se descontarán de aquí.' },
+  bank: { label: 'Banco', color: 'var(--blue)', setup: 'Cada mes empieza en 0€. Pulsa «Cobrar nómina» o añade entradas manualmente.' },
+  cash: { label: 'Efectivo', color: 'var(--orange)', setup: 'Cada mes empieza en 0€. Añade el efectivo que tengas cuando quieras.' },
+}
+
+function CashDepositModal({ onClose }) {
+  const { addCashDeposit } = useApp()
+  const [amount, setAmount] = useState('')
+
+  const handleSave = () => {
+    if (!addCashDeposit(amount)) return
+    onClose()
+  }
+
+  return (
+    <Modal title="Añadir efectivo" onClose={onClose}>
+      <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5, marginBottom: 14 }}>
+        Indica cuánto efectivo tienes. Se sumará a tu cartera de efectivo del mes.
+      </p>
+      <div className="form-group">
+        <label className="form-label">Cantidad (€)</label>
+        <input className="form-input" type="number" min="0" step="0.01" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} autoFocus />
+      </div>
+      <div style={{ display: 'flex', gap: 10 }}>
+        <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>Cancelar</button>
+        <button className="btn btn-primary" style={{ flex: 2, background: 'var(--orange)' }} onClick={handleSave}>Añadir</button>
+      </div>
+    </Modal>
+  )
 }
 
 function WalletModal({ wallet, onClose }) {
@@ -200,49 +226,43 @@ function WalletModal({ wallet, onClose }) {
   const balance = wallet === 'cash' ? cashOnHand : bankBalance
   const moves = wallet === 'cash' ? cashBalanceMoves : bankBalanceMoves
   const meta = WALLET_META[wallet]
-  const isFirstSetup = balance === null
-  const [mode, setMode] = useState(isFirstSetup ? 'set' : 'adjust')
-  const [amount, setAmount] = useState(isFirstSetup ? '' : String(balance ?? ''))
+  const [mode, setMode] = useState('adjust')
+  const [amount, setAmount] = useState('')
   const [adjustType, setAdjustType] = useState('deposit')
   const [note, setNote] = useState('')
-  const [tab, setTab] = useState(isFirstSetup ? 'config' : 'moves')
+  const [tab, setTab] = useState('moves')
 
   const handleSave = () => {
     if (mode === 'set') {
       if (!setWalletBalanceExact(wallet, amount)) return
     } else if (!adjustWalletBalance(wallet, { amount, type: adjustType, note: note.trim() })) return
     setNote('')
-    if (isFirstSetup) setTab('moves')
-    else setAmount(String((wallet === 'cash' ? cashOnHand : bankBalance) ?? ''))
+    setAmount('')
   }
 
   const sortedMoves = [...moves].reverse()
 
   return (
-    <Modal title={isFirstSetup ? `Configurar ${meta.label.toLowerCase()}` : meta.label} onClose={onClose}>
-      {!isFirstSetup && (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-          {[['moves', 'Movimientos'], ['config', 'Ajustar']].map(([v, l]) => (
-            <button key={v} onClick={() => setTab(v)} style={{ flex: 1, padding: '7px', borderRadius: 8, fontSize: 12, fontWeight: 600, border: '1px solid', borderColor: tab === v ? 'var(--accent)' : 'var(--border)', background: tab === v ? 'var(--accent-light)' : 'transparent', color: tab === v ? 'var(--accent)' : 'var(--text2)' }}>
-              {l}
-            </button>
-          ))}
-        </div>
-      )}
+    <Modal title={meta.label} onClose={onClose}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+        {[['moves', 'Movimientos'], ['config', 'Ajustar']].map(([v, l]) => (
+          <button key={v} onClick={() => setTab(v)} style={{ flex: 1, padding: '7px', borderRadius: 8, fontSize: 12, fontWeight: 600, border: '1px solid', borderColor: tab === v ? 'var(--accent)' : 'var(--border)', background: tab === v ? 'var(--accent-light)' : 'transparent', color: tab === v ? 'var(--accent)' : 'var(--text2)' }}>
+            {l}
+          </button>
+        ))}
+      </div>
 
-      {(tab === 'config' || isFirstSetup) && (
+      {tab === 'config' && (
         <>
           <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5, marginBottom: 14 }}>{meta.setup}</p>
-          {!isFirstSetup && (
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              {[['set', 'Fijar saldo'], ['adjust', 'Ajustar']].map(([v, l]) => (
-                <button key={v} onClick={() => setMode(v)} style={{ flex: 1, padding: '7px', borderRadius: 8, fontSize: 12, fontWeight: 600, border: '1px solid', borderColor: mode === v ? 'var(--accent)' : 'var(--border)', background: mode === v ? 'var(--accent-light)' : 'transparent', color: mode === v ? 'var(--accent)' : 'var(--text2)' }}>
-                  {l}
-                </button>
-              ))}
-            </div>
-          )}
-          {mode === 'adjust' && !isFirstSetup && (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+            {[['set', 'Fijar saldo'], ['adjust', 'Ajustar']].map(([v, l]) => (
+              <button key={v} onClick={() => setMode(v)} style={{ flex: 1, padding: '7px', borderRadius: 8, fontSize: 12, fontWeight: 600, border: '1px solid', borderColor: mode === v ? 'var(--accent)' : 'var(--border)', background: mode === v ? 'var(--accent-light)' : 'transparent', color: mode === v ? 'var(--accent)' : 'var(--text2)' }}>
+                {l}
+              </button>
+            ))}
+          </div>
+          {mode === 'adjust' && (
             <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
               {[['deposit', '+ Entrada'], ['withdraw', '− Salida']].map(([v, l]) => (
                 <button key={v} onClick={() => setAdjustType(v)} style={{ flex: 1, padding: '7px', borderRadius: 8, fontSize: 12, fontWeight: 600, border: '1px solid', borderColor: adjustType === v ? (v === 'deposit' ? 'var(--green)' : 'var(--red)') : 'var(--border)', background: adjustType === v ? (v === 'deposit' ? 'rgba(34,168,90,0.1)' : 'rgba(224,61,61,0.08)') : 'transparent', color: adjustType === v ? (v === 'deposit' ? 'var(--green)' : 'var(--red)') : 'var(--text2)' }}>
@@ -255,20 +275,20 @@ function WalletModal({ wallet, onClose }) {
             <label className="form-label">{mode === 'set' ? 'Saldo actual (€)' : 'Cantidad (€)'}</label>
             <input className="form-input" type="number" step="0.01" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} />
           </div>
-          {mode === 'adjust' && !isFirstSetup && (
+          {mode === 'adjust' && (
             <div className="form-group">
               <label className="form-label">Nota (opcional)</label>
-              <input className="form-input" placeholder="Ej: Nómina, cajero…" value={note} onChange={e => setNote(e.target.value)} />
+              <input className="form-input" placeholder="Ej: Transferencia, cajero…" value={note} onChange={e => setNote(e.target.value)} />
             </div>
           )}
-          <div style={{ display: 'flex', gap: 10, marginBottom: tab === 'moves' ? 16 : 0 }}>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
             <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>Cerrar</button>
             <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleSave}>Guardar</button>
           </div>
         </>
       )}
 
-      {tab === 'moves' && !isFirstSetup && (
+      {tab === 'moves' && (
         <>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>
             Saldo actual: <strong style={{ color: meta.color }}>{fmt(balance)}€</strong>
@@ -320,8 +340,19 @@ function WalletModal({ wallet, onClose }) {
 }
 
 function WalletsCard() {
-  const { bankBalance, cashOnHand } = useApp()
+  const { bankBalance, cashOnHand, income, receivePaycheck, paycheckMonth } = useApp()
   const [modal, setModal] = useState(null)
+  const currentMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+  const paycheckDone = paycheckMonth === currentMonth
+
+  const handlePaycheck = () => {
+    const result = receivePaycheck()
+    if (result === 'duplicate') {
+      if (window.confirm('Ya cobraste la nómina este mes. ¿Registrarla otra vez?')) {
+        receivePaycheck(true)
+      }
+    }
+  }
 
   const renderWallet = (wallet, balance) => {
     const meta = WALLET_META[wallet]
@@ -331,19 +362,15 @@ function WalletsCard() {
         onClick={() => setModal(wallet)}
         style={{
           textAlign: 'left',
-          background: balance === null ? 'var(--bg3)' : meta.color + '10',
-          border: `1px solid ${balance === null ? 'var(--border)' : meta.color + '40'}`,
+          background: meta.color + '10',
+          border: `1px solid ${meta.color}40`,
           borderRadius: 10,
           padding: '12px 14px',
           cursor: 'pointer',
         }}
       >
         <div style={{ color: 'var(--text3)', fontSize: 10, marginBottom: 4 }}>{meta.label.toUpperCase()}</div>
-        {balance === null ? (
-          <div style={{ fontSize: 12, color: 'var(--text2)' }}>Configurar</div>
-        ) : (
-          <div style={{ fontSize: 20, fontWeight: 700, color: balance >= 0 ? meta.color : 'var(--red)' }}>{fmt(balance)}€</div>
-        )}
+        <div style={{ fontSize: 20, fontWeight: 700, color: balance >= 0 ? meta.color : 'var(--red)' }}>{fmt(balance ?? 0)}€</div>
       </button>
     )
   }
@@ -351,16 +378,30 @@ function WalletsCard() {
   return (
     <>
       <div className="card" style={{ marginBottom: 12 }}>
-        <div style={{ color: 'var(--text3)', fontSize: 10, marginBottom: 10 }}>DINERO DISPONIBLE</div>
+        <div style={{ color: 'var(--text3)', fontSize: 10, marginBottom: 10 }}>DINERO DEL MES</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           {renderWallet('bank', bankBalance)}
           {renderWallet('cash', cashOnHand)}
         </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            style={{ fontSize: 12, background: paycheckDone ? 'var(--bg3)' : 'var(--green)', color: paycheckDone ? 'var(--text2)' : '#fff', border: paycheckDone ? '1px solid var(--border)' : 'none' }}
+            onClick={handlePaycheck}
+          >
+            {paycheckDone ? '✓ Nómina' : `+ Nómina ${fmt(income)}€`}
+          </button>
+          <button type="button" className="btn btn-ghost" style={{ fontSize: 12, color: 'var(--orange)', borderColor: 'var(--orange)' }} onClick={() => setModal('cash-deposit')}>
+            + Efectivo
+          </button>
+        </div>
         <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 10 }}>
-          Pulsa cada cartera para ajustar el saldo o ver y borrar movimientos
+          El mes empieza en 0€. Cobra la nómina y añade el efectivo que tengas.
         </div>
       </div>
-      {modal && <WalletModal wallet={modal} onClose={() => setModal(null)} />}
+      {modal === 'cash-deposit' && <CashDepositModal onClose={() => setModal(null)} />}
+      {modal === 'bank' || modal === 'cash' ? <WalletModal wallet={modal} onClose={() => setModal(null)} /> : null}
     </>
   )
 }

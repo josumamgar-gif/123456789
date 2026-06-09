@@ -183,22 +183,16 @@ export default function Gastos() {
         </div>
       </div>
 
-      {(bankBalance !== null || cashOnHand !== null) && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-          {bankBalance !== null && (
-            <div className="card-sm" style={{ borderLeft: '3px solid var(--blue)' }}>
-              <div style={{ color: 'var(--text3)', fontSize: 10 }}>BANCO</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: bankBalance >= 0 ? 'var(--blue)' : 'var(--red)' }}>{fmt(bankBalance)}€</div>
-            </div>
-          )}
-          {cashOnHand !== null && (
-            <div className="card-sm" style={{ borderLeft: '3px solid var(--orange)' }}>
-              <div style={{ color: 'var(--text3)', fontSize: 10 }}>EFECTIVO</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: cashOnHand >= 0 ? 'var(--orange)' : 'var(--red)' }}>{fmt(cashOnHand)}€</div>
-            </div>
-          )}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+        <div className="card-sm" style={{ borderLeft: '3px solid var(--blue)' }}>
+          <div style={{ color: 'var(--text3)', fontSize: 10 }}>BANCO</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: (bankBalance ?? 0) >= 0 ? 'var(--blue)' : 'var(--red)' }}>{fmt(bankBalance ?? 0)}€</div>
         </div>
-      )}
+        <div className="card-sm" style={{ borderLeft: '3px solid var(--orange)' }}>
+          <div style={{ color: 'var(--text3)', fontSize: 10 }}>EFECTIVO</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: (cashOnHand ?? 0) >= 0 ? 'var(--orange)' : 'var(--red)' }}>{fmt(cashOnHand ?? 0)}€</div>
+        </div>
+      </div>
 
       {/* Summary */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
