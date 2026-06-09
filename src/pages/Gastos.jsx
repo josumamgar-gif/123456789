@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useApp } from '../context/AppContext'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { TX_PAYMENT_METHODS, TX_PAYMENT_LABELS } from '../data/defaults'
 
 const fmt = (n) => n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -18,20 +19,29 @@ function Modal({ title, onClose, children }) {
 }
 
 function TransactionModal({ tx, onClose }) {
-  const { categories, addTransaction, transactions, setTransactions, extraIncome, setExtraIncome } = useApp()
+  const { categories, addTransaction, updateTransaction } = useApp()
   const isEdit = !!tx
   const [type, setType] = useState(tx?.type || 'expense')
   const [amount, setAmount] = useState(tx?.amount || '')
   const [description, setDescription] = useState(tx?.description || '')
   const [category, setCategory] = useState(tx?.category || categories[0]?.id || '')
   const [date, setDate] = useState(tx?.date || new Date().toISOString().split('T')[0])
+  const [paymentMethod, setPaymentMethod] = useState(tx?.paymentMethod || 'bank')
 
   const handleSave = () => {
     if (!amount || !description) return
+    const data = {
+      type,
+      amount: parseFloat(amount),
+      description,
+      category: type === 'expense' ? category : '',
+      date,
+      paymentMethod,
+    }
     if (isEdit) {
-      setTransactions(prev => prev.map(t => t.id === tx.id ? { ...t, type, amount: parseFloat(amount), description, category: type === 'expense' ? category : '', date } : t))
+      updateTransaction(tx.id, data)
     } else {
-      addTransaction({ type, amount: parseFloat(amount), description, category: type === 'expense' ? category : '', date })
+      addTransaction(data)
     }
     onClose()
   }
@@ -61,6 +71,30 @@ function TransactionModal({ tx, onClose }) {
           </select>
         </div>
       )}
+      <div className="form-group">
+        <label className="form-label">Pagado con</label>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {TX_PAYMENT_METHODS.map(pm => (
+            <button
+              key={pm}
+              type="button"
+              onClick={() => setPaymentMethod(pm)}
+              style={{
+                padding: '10px',
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 700,
+                border: '1px solid',
+                borderColor: paymentMethod === pm ? (pm === 'bank' ? 'var(--blue)' : 'var(--orange)') : 'var(--border)',
+                background: paymentMethod === pm ? (pm === 'bank' ? 'rgba(10,138,173,0.1)' : 'rgba(212,96,10,0.1)') : 'transparent',
+                color: paymentMethod === pm ? (pm === 'bank' ? 'var(--blue)' : 'var(--orange)') : 'var(--text3)',
+              }}
+            >
+              {TX_PAYMENT_LABELS[pm]}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="form-group">
         <label className="form-label">Fecha</label>
         <input className="form-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
@@ -116,7 +150,7 @@ function CategoryModal({ cat, onClose }) {
 }
 
 export default function Gastos() {
-  const { transactions, deleteTransaction, categories, setCategories, extraIncome } = useApp()
+  const { transactions, deleteTransaction, categories, setCategories, bankBalance, cashOnHand } = useApp()
   const [modal, setModal] = useState(null) // null | 'addTx' | {type:'editTx',tx} | 'addCat' | {type:'editCat',cat} | 'cats'
   const [filter, setFilter] = useState('mes')
 
@@ -148,6 +182,23 @@ export default function Gastos() {
           <button className="btn btn-primary" onClick={() => setModal('addTx')}>+ Añadir</button>
         </div>
       </div>
+
+      {(bankBalance !== null || cashOnHand !== null) && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+          {bankBalance !== null && (
+            <div className="card-sm" style={{ borderLeft: '3px solid var(--blue)' }}>
+              <div style={{ color: 'var(--text3)', fontSize: 10 }}>BANCO</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: bankBalance >= 0 ? 'var(--blue)' : 'var(--red)' }}>{fmt(bankBalance)}€</div>
+            </div>
+          )}
+          {cashOnHand !== null && (
+            <div className="card-sm" style={{ borderLeft: '3px solid var(--orange)' }}>
+              <div style={{ color: 'var(--text3)', fontSize: 10 }}>EFECTIVO</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: cashOnHand >= 0 ? 'var(--orange)' : 'var(--red)' }}>{fmt(cashOnHand)}€</div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Summary */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
@@ -195,7 +246,9 @@ export default function Gastos() {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text3)' }}>{cat?.name || ''}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text3)' }}>
+                        {[cat?.name, TX_PAYMENT_LABELS[t.paymentMethod || 'bank']].filter(Boolean).join(' · ')}
+                      </div>
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: t.type === 'expense' ? 'var(--red)' : 'var(--green)' }}>

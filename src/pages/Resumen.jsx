@@ -225,13 +225,98 @@ function EditViviendaModal({ onClose }) {
   )
 }
 
+function MonthSnapshotModal({ snapshot, categories, onClose }) {
+  const monthLabel = format(new Date(snapshot.year, snapshot.month - 1, 1), 'MMMM yyyy', { locale: es })
+  const catLines = Object.entries(snapshot.byCategory || {})
+    .map(([catId, value]) => {
+      const cat = categories.find(c => c.id === catId)
+      return { name: cat?.name || catId, icon: cat?.icon || '📦', value }
+    })
+    .sort((a, b) => b.value - a.value)
+
+  return (
+    <Modal title={monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)} onClose={onClose}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+        <div className="card-sm" style={{ borderLeft: '3px solid var(--red)' }}>
+          <div style={{ color: 'var(--text3)', fontSize: 10 }}>GASTOS</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--red)' }}>{fmt(snapshot.totalExpenses)}€</div>
+        </div>
+        <div className="card-sm" style={{ borderLeft: '3px solid var(--green)' }}>
+          <div style={{ color: 'var(--text3)', fontSize: 10 }}>INGRESOS EXTRA</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--green)' }}>{fmt(snapshot.totalIncome)}€</div>
+        </div>
+      </div>
+      <div className="card-sm" style={{ marginBottom: 14, borderLeft: '3px solid var(--blue)' }}>
+        <div style={{ color: 'var(--text3)', fontSize: 10, marginBottom: 6 }}>DINERO AL CIERRE DEL MES</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+          <span>Banco</span>
+          <span style={{ fontWeight: 600 }}>{snapshot.bankBalanceEnd != null ? `${fmt(snapshot.bankBalanceEnd)}€` : '—'}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8 }}>
+          <span>Efectivo</span>
+          <span style={{ fontWeight: 600 }}>{snapshot.cashOnHandEnd != null ? `${fmt(snapshot.cashOnHandEnd)}€` : '—'}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid var(--border)', fontWeight: 700, fontSize: 15, color: 'var(--blue)' }}>
+          <span>Total</span>
+          <span>{fmt(snapshot.totalLiquidEnd)}€</span>
+        </div>
+      </div>
+      {catLines.length > 0 && (
+        <>
+          <span className="section-title">Por categoría</span>
+          {catLines.map(c => (
+            <div key={c.name} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
+              <span>{c.icon} {c.name}</span>
+              <span style={{ color: 'var(--red)', fontWeight: 600 }}>{fmt(c.value)}€</span>
+            </div>
+          ))}
+        </>
+      )}
+      <button className="btn btn-ghost" style={{ width: '100%', marginTop: 14 }} onClick={onClose}>Cerrar</button>
+    </Modal>
+  )
+}
+
 // ── Página principal ────────────────────────────────────
 export default function Resumen() {
-  const { income, fixedExpenses, setFixedExpenses, debts, setDebts, vivienda, goals, transactions, getMonthlySpend } = useApp()
-  const [modal, setModal] = useState(null) // 'income' | 'vivienda' | 'addFixed' | {type:'editFixed',e} | 'addDebt' | {type:'editDebt',d} | {type:'amortize',d}
+  const {
+    income, fixedExpenses, setFixedExpenses, debts, setDebts, vivienda, goals,
+    transactions, bankBalance, cashOnHand,
+    closeMonth, startFreshMonth, getMonthExpenseTotal,
+    monthlyHistory, activeMonthKey, buildMonthSnapshot, categories,
+  } = useApp()
+  const [modal, setModal] = useState(null)
 
   const now = new Date()
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const currentYear = now.getFullYear()
+  const currentMonthNum = now.getMonth() + 1
+  const currentMonth = `${currentYear}-${String(currentMonthNum).padStart(2, '0')}`
+  const monthLabel = format(now, 'MMMM yyyy', { locale: es })
+
+  const currentExpenses = transactions
+    .filter(t => {
+      const d = new Date(t.date)
+      return d.getFullYear() === currentYear && d.getMonth() + 1 === currentMonthNum && t.type === 'expense'
+    })
+    .reduce((s, t) => s + t.amount, 0)
+  const currentIncome = transactions
+    .filter(t => {
+      const d = new Date(t.date)
+      return d.getFullYear() === currentYear && d.getMonth() + 1 === currentMonthNum && t.type === 'income'
+    })
+    .reduce((s, t) => s + t.amount, 0)
+  const currentLiquid = (bankBalance ?? 0) + (cashOnHand ?? 0)
+
+  const handleCloseMonth = () => {
+    const label = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)
+    if (!window.confirm(`¿Cerrar ${label}?\n\nSe guardará el resumen con tus gastos y el dinero que te quedó. Los apuntes del mes se limpiarán para empezar el siguiente.`)) return
+    closeMonth(currentYear, currentMonthNum)
+  }
+
+  const handleStartFresh = () => {
+    if (!window.confirm('¿Empezar el mes actual limpio?\n\nSe borrarán los apuntes y movimientos de banco/efectivo de este mes. Los saldos configurados se mantienen.')) return
+    startFreshMonth({ resetBalances: false })
+  }
 
   const fixedTotal = fixedExpenses.filter(e => e.active).reduce((s, e) => s + e.amount, 0)
   const debtThisMonth = debts.reduce((s, d) => {
@@ -264,8 +349,13 @@ export default function Resumen() {
 
   const historyData = Array.from({ length: 6 }, (_, i) => {
     const d = subMonths(now, 5 - i)
-    return { month: format(d, 'MMM', { locale: es }), gasto: getMonthlySpend(d.getFullYear(), d.getMonth() + 1) }
+    const y = d.getFullYear()
+    const m = d.getMonth() + 1
+    return { month: format(d, 'MMM', { locale: es }), gasto: getMonthExpenseTotal(y, m), year: y, monthNum: m }
   })
+
+  const sortedHistory = [...monthlyHistory].sort((a, b) => b.id.localeCompare(a.id))
+  const livePreview = buildMonthSnapshot(currentYear, currentMonthNum)
 
   return (
     <div className="page">
@@ -381,6 +471,85 @@ export default function Resumen() {
         </div>
       </div>
 
+      {/* Mes en curso */}
+      <div className="card" style={{ marginBottom: 12, borderLeft: '3px solid var(--accent)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+          <div>
+            <span className="section-title" style={{ margin: 0 }}>Mes en curso</span>
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4, textTransform: 'capitalize' }}>{monthLabel}</div>
+          </div>
+          {activeMonthKey && (
+            <span style={{ fontSize: 10, color: 'var(--text3)' }}>Seguimiento: {activeMonthKey}</span>
+          )}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+          <div>
+            <div style={{ color: 'var(--text3)', fontSize: 10 }}>GASTOS</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--red)' }}>{fmt(currentExpenses)}€</div>
+          </div>
+          <div>
+            <div style={{ color: 'var(--text3)', fontSize: 10 }}>INGRESOS EXTRA</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--green)' }}>{fmt(currentIncome)}€</div>
+          </div>
+        </div>
+        <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: '10px 12px', marginBottom: 12, fontSize: 12 }}>
+          Dinero ahora: <strong style={{ color: 'var(--blue)' }}>{fmt(currentLiquid)}€</strong>
+          {(bankBalance != null || cashOnHand != null) && (
+            <span style={{ color: 'var(--text3)' }}>
+              {' '}({bankBalance != null ? `${fmt(bankBalance)}€ banco` : ''}{bankBalance != null && cashOnHand != null ? ' + ' : ''}{cashOnHand != null ? `${fmt(cashOnHand)}€ efectivo` : ''})
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={handleCloseMonth}>
+            Cerrar mes
+          </button>
+          <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={handleStartFresh}>
+            Reiniciar mes
+          </button>
+        </div>
+      </div>
+
+      {/* Histórico mensual */}
+      <div className="card" style={{ marginBottom: 12 }}>
+        <span className="section-title">Meses cerrados</span>
+        {sortedHistory.length === 0 ? (
+          <div style={{ color: 'var(--text3)', fontSize: 12, padding: '10px 0' }}>
+            Aún no hay meses cerrados. Al final de cada mes usa <strong>Cerrar mes</strong> para guardar gastos y saldo final.
+          </div>
+        ) : (
+          sortedHistory.map(snap => {
+            const label = format(new Date(snap.year, snap.month - 1, 1), 'MMMM yyyy', { locale: es })
+            return (
+              <button
+                key={snap.id}
+                type="button"
+                onClick={() => setModal({ type: 'monthSnap', snap })}
+                style={{ display: 'block', width: '100%', textAlign: 'left', padding: '11px 0', borderBottom: '1px solid var(--border)', background: 'none', border: 'none', borderBottomWidth: 1, borderBottomStyle: 'solid', borderBottomColor: 'var(--border)', cursor: 'pointer' }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, textTransform: 'capitalize' }}>{label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue)' }}>{fmt(snap.totalLiquidEnd)}€</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 11, color: 'var(--text3)' }}>
+                  <span>Gastos: {fmt(snap.totalExpenses)}€</span>
+                  <span>Te quedaste con {fmt(snap.totalLiquidEnd)}€</span>
+                </div>
+              </button>
+            )
+          })
+        )}
+        {transactions.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setModal({ type: 'monthSnap', snap: livePreview })}
+            style={{ width: '100%', marginTop: 10, padding: '10px', borderRadius: 8, border: '1px dashed var(--border)', background: 'var(--bg3)', fontSize: 12, color: 'var(--text2)', cursor: 'pointer' }}
+          >
+            Vista previa de {monthLabel} (sin cerrar)
+          </button>
+        )}
+      </div>
+
       {/* Histórico */}
       <div className="card" style={{ marginBottom: 12 }}>
         <span className="section-title">Gasto últimos 6 meses</span>
@@ -408,6 +577,7 @@ export default function Resumen() {
       {modal === 'addDebt' && <EditDebtModal debt={null} onClose={() => setModal(null)} />}
       {modal?.type === 'editDebt' && <EditDebtModal debt={modal.d} onClose={() => setModal(null)} />}
       {modal?.type === 'amortize' && <AmortizeModal debt={modal.d} onClose={() => setModal(null)} />}
+      {modal?.type === 'monthSnap' && <MonthSnapshotModal snapshot={modal.snap} categories={categories} onClose={() => setModal(null)} />}
     </div>
   )
 }

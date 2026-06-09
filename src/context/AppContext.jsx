@@ -1,4 +1,4 @@
-import React, { createContext, useContext } from 'react'
+import React, { createContext, useContext, useEffect } from 'react'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import {
   FIXED_EXPENSES_DEFAULT,
@@ -10,6 +10,9 @@ import {
 } from '../data/defaults'
 
 const AppContext = createContext(null)
+const ACCOUNTING_VERSION = 1
+
+const monthKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`
 
 export function AppProvider({ children }) {
   const [income, setIncome] = useLocalStorage('income', INCOME_DEFAULT)
@@ -27,6 +30,203 @@ export function AppProvider({ children }) {
   const [sorareBalances, setSorareBalances] = useLocalStorage('sorareBalances', { cash: 0, eth: 0 })
   const [sorareBalanceMoves, setSorareBalanceMoves] = useLocalStorage('sorareBalanceMoves', [])
   const [cryptoPrices, setCryptoPrices] = useLocalStorage('cryptoPrices', {})
+  const [bankBalance, setBankBalance] = useLocalStorage('bankBalance', null)
+  const [cashOnHand, setCashOnHand] = useLocalStorage('cashOnHand', null)
+  const [bankBalanceMoves, setBankBalanceMoves] = useLocalStorage('bankBalanceMoves', [])
+  const [cashBalanceMoves, setCashBalanceMoves] = useLocalStorage('cashBalanceMoves', [])
+  const [monthlyHistory, setMonthlyHistory] = useLocalStorage('monthlyHistory', [])
+  const [activeMonthKey, setActiveMonthKey] = useLocalStorage('activeMonthKey', null)
+  const [accountingConfig, setAccountingConfig] = useLocalStorage('accountingConfig', { version: 0 })
+
+  const newMoveId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+
+  const clearMonthTracking = () => {
+    setTransactions([])
+    setBankBalanceMoves([])
+    setCashBalanceMoves([])
+  }
+
+  const buildMonthSnapshot = (year, month) => {
+    const monthTx = transactions.filter(t => {
+      const d = new Date(t.date)
+      return d.getFullYear() === year && d.getMonth() + 1 === month
+    })
+    const expenses = monthTx.filter(t => t.type === 'expense')
+    const incomes = monthTx.filter(t => t.type === 'income')
+    const byCategory = {}
+    expenses.forEach(t => {
+      byCategory[t.category] = (byCategory[t.category] || 0) + t.amount
+    })
+    return {
+      id: monthKey(year, month),
+      year,
+      month,
+      totalExpenses: expenses.reduce((s, t) => s + t.amount, 0),
+      totalIncome: incomes.reduce((s, t) => s + t.amount, 0),
+      expenseCount: expenses.length,
+      byCategory,
+      bankBalanceEnd: bankBalance,
+      cashOnHandEnd: cashOnHand,
+      totalLiquidEnd: (bankBalance ?? 0) + (cashOnHand ?? 0),
+      closedAt: new Date().toISOString(),
+    }
+  }
+
+  const closeMonth = (year, month) => {
+    const snapshot = buildMonthSnapshot(year, month)
+    setMonthlyHistory(prev => [...prev.filter(s => s.id !== snapshot.id), snapshot].sort((a, b) => b.id.localeCompare(a.id)))
+    clearMonthTracking()
+    const nextMonth = month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 }
+    setActiveMonthKey(monthKey(nextMonth.year, nextMonth.month))
+    return snapshot
+  }
+
+  const startFreshMonth = ({ resetBalances = false } = {}) => {
+    clearMonthTracking()
+    if (resetBalances) {
+      setBankBalance(null)
+      setCashOnHand(null)
+    }
+    const now = new Date()
+    setActiveMonthKey(monthKey(now.getFullYear(), now.getMonth() + 1))
+  }
+
+  const getMonthExpenseTotal = (year, month) => {
+    const key = monthKey(year, month)
+    const snap = monthlyHistory.find(s => s.id === key)
+    if (snap) return snap.totalExpenses
+    return transactions
+      .filter(t => {
+        const d = new Date(t.date)
+        return d.getFullYear() === year && d.getMonth() + 1 === month && t.type === 'expense'
+      })
+      .reduce((s, t) => s + t.amount, 0)
+  }
+
+  useEffect(() => {
+    if (accountingConfig.version >= ACCOUNTING_VERSION) return
+    startFreshMonth({ resetBalances: false })
+    setAccountingConfig({ version: ACCOUNTING_VERSION, startedAt: new Date().toISOString() })
+  }, [])
+
+  const getWalletBalance = (wallet) => (wallet === 'cash' ? cashOnHand : bankBalance)
+
+  const setWalletBalance = (wallet, value) => {
+    if (wallet === 'cash') setCashOnHand(value)
+    else setBankBalance(value)
+  }
+
+  const applyWalletBalanceDelta = (wallet, delta) => {
+    if (!delta) return
+    if (getWalletBalance(wallet) === null) return
+    setWalletBalance(wallet, (getWalletBalance(wallet) ?? 0) + delta)
+  }
+
+  const recordWalletMove = (wallet, move) => {
+    const entry = {
+      id: move.id || newMoveId(),
+      date: move.date || new Date().toISOString(),
+      category: 'manual',
+      ...move,
+    }
+    if (wallet === 'cash') setCashBalanceMoves(prev => [...prev, entry])
+    else setBankBalanceMoves(prev => [...prev, entry])
+    return entry.id
+  }
+
+  const removeWalletMoveById = (wallet, moveId) => {
+    if (wallet === 'cash') setCashBalanceMoves(prev => prev.filter(m => m.id !== moveId))
+    else setBankBalanceMoves(prev => prev.filter(m => m.id !== moveId))
+  }
+
+  const findWalletMove = (wallet, moveId) => {
+    const list = wallet === 'cash' ? cashBalanceMoves : bankBalanceMoves
+    return list.find(m => m.id === moveId)
+  }
+
+  const transactionBalanceEffect = (tx) => {
+    if (!tx || tx.amount == null) return 0
+    return tx.type === 'expense' ? -tx.amount : tx.amount
+  }
+
+  const getTxWallet = (tx) => tx?.paymentMethod || 'bank'
+
+  const applyTransactionToWallet = (tx, { moveId, transactionId } = {}) => {
+    const wallet = getTxWallet(tx)
+    const effect = transactionBalanceEffect(tx)
+    if (!effect || getWalletBalance(wallet) === null) return null
+
+    applyWalletBalanceDelta(wallet, effect)
+    return recordWalletMove(wallet, {
+      id: moveId,
+      type: effect > 0 ? 'deposit' : 'withdraw',
+      amount: Math.abs(effect),
+      category: 'transaction',
+      note: tx.description,
+      transactionId: transactionId || tx.id,
+    })
+  }
+
+  const removeTransactionMoves = (txId) => {
+    ;['bank', 'cash'].forEach(wallet => {
+      const list = wallet === 'cash' ? cashBalanceMoves : bankBalanceMoves
+      list.filter(m => m.transactionId === txId).forEach(move => {
+        const reverse = move.type === 'deposit' ? -move.amount : move.amount
+        applyWalletBalanceDelta(wallet, reverse)
+        removeWalletMoveById(wallet, move.id)
+      })
+    })
+  }
+
+  const setWalletBalanceExact = (wallet, amount, note = 'Fijar saldo') => {
+    const val = parseFloat(amount)
+    if (isNaN(val)) return false
+    const old = getWalletBalance(wallet) ?? 0
+    setWalletBalance(wallet, val)
+    const delta = val - old
+    if (delta !== 0) {
+      recordWalletMove(wallet, {
+        category: 'balance_set',
+        type: delta > 0 ? 'deposit' : 'withdraw',
+        amount: Math.abs(delta),
+        note,
+      })
+    }
+    return true
+  }
+
+  const adjustWalletBalance = (wallet, { amount, type = 'deposit', note = '' }) => {
+    const amt = parseFloat(amount)
+    if (!amt || amt <= 0 || getWalletBalance(wallet) === null) return false
+    const delta = type === 'withdraw' ? -amt : amt
+    applyWalletBalanceDelta(wallet, delta)
+    recordWalletMove(wallet, {
+      category: 'manual',
+      type,
+      amount: amt,
+      note: note || (type === 'deposit' ? 'Entrada manual' : 'Salida manual'),
+    })
+    return true
+  }
+
+  const deleteWalletMove = (wallet, moveId) => {
+    const move = findWalletMove(wallet, moveId)
+    if (!move) return false
+
+    const reverse = move.type === 'deposit' ? -move.amount : move.amount
+    applyWalletBalanceDelta(wallet, reverse)
+    removeWalletMoveById(wallet, moveId)
+
+    if (move.transactionId) {
+      setTransactions(prev => prev.filter(t => t.id !== move.transactionId))
+    }
+    return true
+  }
+
+  const recordSorareBankMove = (move) => {
+    if (bankBalance === null) return
+    recordWalletMove('bank', { category: 'sorare', ...move })
+  }
 
   // Computed: total monthly obligations
   const getCurrentMonth = () => {
@@ -38,10 +238,8 @@ export function AppProvider({ children }) {
     const month = getCurrentMonth()
     let total = 0
 
-    // Fixed expenses
     fixedExpenses.filter(e => e.active).forEach(e => total += e.amount)
 
-    // Debt quotas active this month
     debts.forEach(d => {
       if (d.type === 'aplazado') {
         if (d.months && d.months.includes(month)) total += d.monthlyQuota
@@ -67,10 +265,42 @@ export function AppProvider({ children }) {
   }
 
   const addTransaction = (tx) => {
-    setTransactions(prev => [{ ...tx, id: Date.now().toString() }, ...prev])
+    const id = Date.now().toString()
+    const amount = parseFloat(tx.amount)
+    const paymentMethod = tx.paymentMethod || 'bank'
+    const saved = {
+      ...tx,
+      id,
+      amount,
+      paymentMethod,
+      category: tx.type === 'expense' ? tx.category : '',
+    }
+    applyTransactionToWallet(saved, { transactionId: id })
+    setTransactions(prev => [saved, ...prev])
   }
 
-  const deleteTransaction = (id) => {
+  const updateTransaction = (id, updates) => {
+    const tx = transactions.find(t => t.id === id)
+    if (!tx) return
+
+    removeTransactionMoves(id)
+
+    const merged = {
+      ...tx,
+      ...updates,
+      amount: updates.amount != null ? parseFloat(updates.amount) : tx.amount,
+      paymentMethod: updates.paymentMethod || tx.paymentMethod || 'bank',
+      category: (updates.type ?? tx.type) === 'expense'
+        ? (updates.category ?? tx.category)
+        : '',
+    }
+
+    applyTransactionToWallet(merged, { transactionId: id })
+    setTransactions(prev => prev.map(t => t.id === id ? merged : t))
+  }
+
+  const deleteTransaction = (id, { skipMoveCleanup = false } = {}) => {
+    if (!skipMoveCleanup) removeTransactionMoves(id)
     setTransactions(prev => prev.filter(t => t.id !== id))
   }
 
@@ -86,9 +316,7 @@ export function AppProvider({ children }) {
     setGoals(prev => prev.filter(g => g.id !== id))
   }
 
-  const newMoveId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-
-  const applyWalletDelta = (wallet, delta) => {
+  const applySorareWalletDelta = (wallet, delta) => {
     if (!['cash', 'eth'].includes(wallet)) return
     setSorareBalances(prev => ({
       cash: prev?.cash ?? 0,
@@ -107,14 +335,20 @@ export function AppProvider({ children }) {
   }
 
   const reverseCardPurchase = (card) => {
-    if (!card?.paymentMethod || card.paymentMethod === 'apple_pay') return
+    if (!card?.paymentMethod) return
     const price = parseFloat(card.buyPrice) || 0
+    if (card.paymentMethod === 'apple_pay' && price > 0) {
+      applyWalletBalanceDelta('bank', price)
+      const bankMove = bankBalanceMoves.find(m => m.cardId === card.id && m.category === 'sorare')
+      if (bankMove) removeWalletMoveById('bank', bankMove.id)
+      return
+    }
     if (card.paymentMethod === 'cash' && price > 0) {
-      applyWalletDelta('cash', price)
+      applySorareWalletDelta('cash', price)
     }
     if (card.paymentMethod === 'eth') {
       const eth = parseFloat(card.buyEthAmount) || 0
-      if (eth > 0) applyWalletDelta('eth', eth)
+      if (eth > 0) applySorareWalletDelta('eth', eth)
     }
   }
 
@@ -125,7 +359,7 @@ export function AppProvider({ children }) {
     const { paymentMethod, player } = card
 
     if (paymentMethod === 'cash' && price > 0) {
-      applyWalletDelta('cash', -price)
+      applySorareWalletDelta('cash', -price)
       recordSorareMove({
         category: 'card_buy',
         type: 'withdraw',
@@ -137,7 +371,7 @@ export function AppProvider({ children }) {
         note: `Compra: ${player}`,
       })
     } else if (paymentMethod === 'eth' && ethSpent > 0) {
-      applyWalletDelta('eth', -ethSpent)
+      applySorareWalletDelta('eth', -ethSpent)
       recordSorareMove({
         category: 'card_buy',
         type: 'withdraw',
@@ -149,12 +383,10 @@ export function AppProvider({ children }) {
         note: `Compra ETH: ${player}${price ? ` (${price}€)` : ''}`,
       })
     } else if (paymentMethod === 'apple_pay' && price > 0) {
-      recordSorareMove({
-        category: 'card_buy',
+      applyWalletBalanceDelta('bank', -price)
+      recordSorareBankMove({
         type: 'withdraw',
-        wallet: 'apple_pay',
         amount: price,
-        paymentMethod: 'apple_pay',
         cardId: id,
         player,
         note: `Apple Pay: ${player}`,
@@ -182,7 +414,7 @@ export function AppProvider({ children }) {
       sellDate: new Date().toISOString(),
     })
     if (creditToCash && price > 0) {
-      applyWalletDelta('cash', price)
+      applySorareWalletDelta('cash', price)
       recordSorareMove({
         category: 'card_sell',
         type: 'deposit',
@@ -204,7 +436,7 @@ export function AppProvider({ children }) {
   const addSorarePrize = (prize) => {
     const eth = parseFloat(prize.ethAmount) || 0
     if (eth > 0) {
-      applyWalletDelta('eth', eth)
+      applySorareWalletDelta('eth', eth)
       recordSorareMove({
         category: 'prize',
         type: 'deposit',
@@ -220,7 +452,7 @@ export function AppProvider({ children }) {
     const amt = parseFloat(amount)
     if (!amt || amt <= 0 || !['cash', 'eth'].includes(wallet)) return false
     const delta = type === 'withdraw' ? -amt : amt
-    applyWalletDelta(wallet, delta)
+    applySorareWalletDelta(wallet, delta)
     recordSorareMove({
       category: 'manual',
       wallet,
@@ -239,7 +471,10 @@ export function AppProvider({ children }) {
       vivienda, setVivienda,
       crypto, setCrypto,
       categories, setCategories,
-      transactions, addTransaction, deleteTransaction,
+      transactions, addTransaction, updateTransaction, deleteTransaction,
+      bankBalance, cashOnHand,
+      bankBalanceMoves, cashBalanceMoves,
+      setWalletBalanceExact, adjustWalletBalance, deleteWalletMove,
       extraIncome, setExtraIncome,
       goals, addGoal, updateGoal, deleteGoal,
       sorareCards, addSorareCard, updateSorareCard, sellSorareCard, deleteSorareCard,
@@ -253,6 +488,8 @@ export function AppProvider({ children }) {
       getMonthlyObligations,
       getMonthlyTransactions,
       getMonthlySpend,
+      monthlyHistory, activeMonthKey,
+      closeMonth, startFreshMonth, getMonthExpenseTotal, buildMonthSnapshot,
     }}>
       {children}
     </AppContext.Provider>

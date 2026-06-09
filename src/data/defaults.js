@@ -108,6 +108,20 @@ export const RARITY_STYLE = {
 
 export const INCOME_DEFAULT = 2400
 
+export const TX_PAYMENT_METHODS = ['bank', 'cash']
+
+export const TX_PAYMENT_LABELS = {
+  bank: 'Banco',
+  cash: 'Efectivo',
+}
+
+export const WALLET_MOVE_LABELS = {
+  transaction: 'Apunte',
+  manual: 'Ajuste manual',
+  sorare: 'Sorare',
+  balance_set: 'Fijar saldo',
+}
+
 export const INVESTMENT_RECS = [
   { symbol: 'BTC', name: 'Bitcoin', reason: 'Reserva de valor, alta liquidez', risk: 'medio' },
   { symbol: 'ETH', name: 'Ethereum', reason: 'Ecosistema DeFi sólido', risk: 'medio' },
