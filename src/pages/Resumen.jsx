@@ -3,8 +3,23 @@ import { useApp } from '../context/AppContext'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { format, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { TX_PAYMENT_METHODS, TX_PAYMENT_LABELS } from '../data/defaults'
 
 const fmt = (n) => n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const isChargeDue = (dueDay, refDate = new Date()) => refDate.getDate() >= (dueDay || 1)
+const DueDaySelect = ({ value, onChange }) => (
+  <div className="form-group">
+    <label className="form-label">Día del cargo (cada mes)</label>
+    <select className="form-input" value={value} onChange={onChange}>
+      {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+        <option key={d} value={d}>Día {d}</option>
+      ))}
+    </select>
+    <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>
+      Ese día se registra el gasto automáticamente y solo entonces cuenta en tu disponible.
+    </p>
+  </div>
+)
 
 // ── Modal genérico ──────────────────────────────────────
 function Modal({ title, onClose, children }) {
@@ -44,13 +59,22 @@ function EditFixedModal({ expense, onClose }) {
   const [name, setName] = useState(expense?.name || '')
   const [amount, setAmount] = useState(expense?.amount || '')
   const [category, setCategory] = useState(expense?.category || 'otros')
+  const [dueDay, setDueDay] = useState(expense?.dueDay || 1)
+  const [paymentMethod, setPaymentMethod] = useState(expense?.paymentMethod || 'bank')
 
   const handleSave = () => {
     if (!name || !amount) return
+    const data = {
+      name,
+      amount: parseFloat(amount),
+      category,
+      dueDay: parseInt(dueDay, 10) || 1,
+      paymentMethod,
+    }
     if (isNew) {
-      setFixedExpenses(prev => [...prev, { id: Date.now().toString(), name, amount: parseFloat(amount), category, active: true }])
+      setFixedExpenses(prev => [...prev, { id: Date.now().toString(), ...data, active: true }])
     } else {
-      setFixedExpenses(prev => prev.map(e => e.id === expense.id ? { ...e, name, amount: parseFloat(amount), category } : e))
+      setFixedExpenses(prev => prev.map(e => e.id === expense.id ? { ...e, ...data } : e))
     }
     onClose()
   }
@@ -71,6 +95,17 @@ function EditFixedModal({ expense, onClose }) {
           {categories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
         </select>
       </div>
+      <DueDaySelect value={dueDay} onChange={e => setDueDay(e.target.value)} />
+      <div className="form-group">
+        <label className="form-label">Pagado con</label>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {TX_PAYMENT_METHODS.map(pm => (
+            <button key={pm} type="button" onClick={() => setPaymentMethod(pm)} style={{ padding: '8px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: '1px solid', borderColor: paymentMethod === pm ? 'var(--accent)' : 'var(--border)', background: paymentMethod === pm ? 'var(--accent-light)' : 'transparent', color: paymentMethod === pm ? 'var(--accent)' : 'var(--text3)' }}>
+              {TX_PAYMENT_LABELS[pm]}
+            </button>
+          ))}
+        </div>
+      </div>
       <div style={{ display: 'flex', gap: 10 }}>
         <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>Cancelar</button>
         <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleSave}>Guardar</button>
@@ -90,10 +125,18 @@ function EditDebtModal({ debt, onClose }) {
   const [paid, setPaid] = useState(debt?.paid || '')
   const [endDate, setEndDate] = useState(debt?.endDate || '')
   const [months, setMonths] = useState(debt?.months?.join(', ') || '')
+  const [dueDay, setDueDay] = useState(debt?.dueDay || 1)
+  const [paymentMethod, setPaymentMethod] = useState(debt?.paymentMethod || 'bank')
 
   const handleSave = () => {
     if (!name || !monthlyQuota) return
-    const base = { name, type, monthlyQuota: parseFloat(monthlyQuota), totalAmount: parseFloat(totalAmount) || 0 }
+    const base = {
+      name, type,
+      monthlyQuota: parseFloat(monthlyQuota),
+      totalAmount: parseFloat(totalAmount) || 0,
+      dueDay: parseInt(dueDay, 10) || 1,
+      paymentMethod,
+    }
     const full = type === 'prestamo'
       ? { ...base, paid: parseFloat(paid) || 0, endDate }
       : { ...base, months: months.split(',').map(m => m.trim()).filter(Boolean) }
@@ -149,6 +192,17 @@ function EditDebtModal({ debt, onClose }) {
           <input className="form-input" placeholder="2025-07, 2025-08, 2025-09" value={months} onChange={e => setMonths(e.target.value)} />
         </div>
       )}
+      <DueDaySelect value={dueDay} onChange={e => setDueDay(e.target.value)} />
+      <div className="form-group">
+        <label className="form-label">Pagado con</label>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {TX_PAYMENT_METHODS.map(pm => (
+            <button key={pm} type="button" onClick={() => setPaymentMethod(pm)} style={{ padding: '8px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: '1px solid', borderColor: paymentMethod === pm ? 'var(--accent)' : 'var(--border)', background: paymentMethod === pm ? 'var(--accent-light)' : 'transparent', color: paymentMethod === pm ? 'var(--accent)' : 'var(--text3)' }}>
+              {TX_PAYMENT_LABELS[pm]}
+            </button>
+          ))}
+        </div>
+      </div>
       <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
         <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>Cancelar</button>
         <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleSave}>Guardar</button>
@@ -284,6 +338,7 @@ export default function Resumen() {
     transactions, bankBalance, cashOnHand,
     closeMonth, startFreshMonth, getMonthExpenseTotal,
     monthlyHistory, activeMonthKey, buildMonthSnapshot, categories,
+    getDueFixedExpenses, getDueDebts,
   } = useApp()
   const [modal, setModal] = useState(null)
 
@@ -318,12 +373,13 @@ export default function Resumen() {
     startFreshMonth()
   }
 
-  const fixedTotal = fixedExpenses.filter(e => e.active).reduce((s, e) => s + e.amount, 0)
-  const debtThisMonth = debts.reduce((s, d) => {
-    if (d.type === 'prestamo') return s + d.monthlyQuota
-    if (d.type === 'aplazado' && d.months?.includes(currentMonth)) return s + d.monthlyQuota
-    return s
-  }, 0)
+  const fixedTotal = getDueFixedExpenses(now).reduce((s, e) => s + e.amount, 0)
+  const debtThisMonth = getDueDebts(now).reduce((s, d) => s + d.monthlyQuota, 0)
+  const fixedPending = fixedExpenses.filter(e => e.active && !isChargeDue(e.dueDay, now))
+  const debtPending = debts.filter(d => {
+    const active = d.type === 'prestamo' || d.months?.includes(currentMonth)
+    return active && !isChargeDue(d.dueDay, now)
+  })
 
   const activeGoals = [...goals].filter(g => (g.savedAmount || 0) < g.targetAmount).sort((a, b) => a.priority - b.priority)
   let remaining = income - fixedTotal - debtThisMonth
@@ -408,15 +464,27 @@ export default function Resumen() {
               style={{ width: 17, height: 17, borderRadius: 4, border: '1px solid var(--border2)', background: e.active ? 'var(--accent)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 11, color: '#fff' }}>
               {e.active ? '✓' : ''}
             </button>
-            <span style={{ flex: 1, fontSize: 13, color: e.active ? 'var(--text)' : 'var(--text3)' }}>{e.name}</span>
+            <span style={{ flex: 1, fontSize: 13, color: e.active ? 'var(--text)' : 'var(--text3)' }}>
+              {e.name}
+              {e.active && (
+                <span style={{ display: 'block', fontSize: 10, color: isChargeDue(e.dueDay, now) ? 'var(--text3)' : 'var(--yellow)', marginTop: 2 }}>
+                  Día {e.dueDay || 1}{!isChargeDue(e.dueDay, now) ? ' · Pendiente' : ' · Auto'}
+                </span>
+              )}
+            </span>
             <span style={{ fontSize: 13, color: e.active ? 'var(--orange)' : 'var(--text3)' }}>-{fmt(e.amount)}€</span>
             <button onClick={() => setModal({ type: 'editFixed', e })} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px' }}>✏️</button>
             <button onClick={() => setFixedExpenses(prev => prev.filter(x => x.id !== e.id))} style={{ fontSize: 11, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
           </div>
         ))}
         <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 8 }}>
-          <span style={{ fontSize: 12, color: 'var(--orange)' }}>Total: -{fmt(fixedTotal)}€/mes</span>
+          <span style={{ fontSize: 12, color: 'var(--orange)' }}>Cargado ya: -{fmt(fixedTotal)}€</span>
         </div>
+        {fixedPending.length > 0 && (
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>
+            Pendiente: {fixedPending.map(e => `${e.name} (día ${e.dueDay || 1})`).join(', ')}
+          </div>
+        )}
       </div>
 
       {/* Deudas */}
@@ -433,6 +501,11 @@ export default function Resumen() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 500 }}>{d.name}</div>
+                  {active && (
+                    <div style={{ fontSize: 10, color: isChargeDue(d.dueDay, now) ? 'var(--text3)' : 'var(--yellow)', marginTop: 2 }}>
+                      Día {d.dueDay || 1}{!isChargeDue(d.dueDay, now) ? ' · Pendiente' : ' · Auto'}
+                    </div>
+                  )}
                   {d.type === 'aplazado' && d.months && (
                     <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>Cuotas: {d.months.join(', ')}</div>
                   )}
@@ -467,8 +540,13 @@ export default function Resumen() {
           )
         })}
         <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 8 }}>
-          <span style={{ fontSize: 12, color: 'var(--red)' }}>Este mes: -{fmt(debtThisMonth)}€</span>
+          <span style={{ fontSize: 12, color: 'var(--red)' }}>Cargado ya: -{fmt(debtThisMonth)}€</span>
         </div>
+        {debtPending.length > 0 && (
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>
+            Pendiente: {debtPending.map(d => `${d.name} (día ${d.dueDay || 1})`).join(', ')}
+          </div>
+        )}
       </div>
 
       {/* Mes en curso */}

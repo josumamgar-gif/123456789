@@ -475,12 +475,14 @@ function GoalsCard() {
 }
 
 function DebtCard() {
-  const { debts } = useApp()
+  const { debts, getDueDebts } = useApp()
   const now = new Date()
   const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const isDue = (dueDay) => now.getDate() >= (dueDay || 1)
   const loan = debts.find(d => d.id === 'prestamo')
   const pct = loan ? (loan.paid / loan.totalAmount) * 100 : 0
   const activeAplazados = debts.filter(d => d.type === 'aplazado' && d.months?.includes(month))
+  const dueDebts = getDueDebts(now)
 
   if (!loan && !activeAplazados.length) return null
 
@@ -490,7 +492,12 @@ function DebtCard() {
       {loan && (
         <div style={{ marginBottom: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-            <span style={{ fontSize: 13 }}>{loan.name}</span>
+            <span style={{ fontSize: 13 }}>
+              {loan.name}
+              <span style={{ display: 'block', fontSize: 10, color: isDue(loan.dueDay) ? 'var(--text3)' : 'var(--yellow)' }}>
+                Día {loan.dueDay || 1}{!isDue(loan.dueDay) ? ' · Pendiente' : ''}
+              </span>
+            </span>
             <span style={{ fontSize: 13, color: 'var(--red)', fontWeight: 600 }}>-{fmt(loan.monthlyQuota)}€/mes</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
@@ -504,10 +511,20 @@ function DebtCard() {
       )}
       {activeAplazados.map(d => (
         <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: '1px solid var(--border)' }}>
-          <span style={{ fontSize: 13 }}>{d.name}</span>
-          <span style={{ fontSize: 13, color: 'var(--red)', fontWeight: 600 }}>-{fmt(d.monthlyQuota)}€</span>
+          <span style={{ fontSize: 13 }}>
+            {d.name}
+            <span style={{ display: 'block', fontSize: 10, color: isDue(d.dueDay) ? 'var(--text3)' : 'var(--yellow)' }}>
+              Día {d.dueDay || 1}{!isDue(d.dueDay) ? ' · Pendiente' : ''}
+            </span>
+          </span>
+          <span style={{ fontSize: 13, color: isDue(d.dueDay) ? 'var(--red)' : 'var(--text3)', fontWeight: 600 }}>-{fmt(d.monthlyQuota)}€</span>
         </div>
       ))}
+      {dueDebts.length > 0 && (
+        <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
+          Cuotas ya cargadas este mes: -{fmt(dueDebts.reduce((s, d) => s + d.monthlyQuota, 0))}€
+        </div>
+      )}
     </div>
   )
 }

@@ -14,6 +14,13 @@ const ACCOUNTING_VERSION = 2
 
 const monthKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`
 
+const chargeDateFor = (year, month, dueDay) => {
+  const day = Math.min(Math.max(1, dueDay || 1), new Date(year, month, 0).getDate())
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+const isChargeDue = (dueDay, refDate = new Date()) => refDate.getDate() >= (dueDay || 1)
+
 export function AppProvider({ children }) {
   const [income, setIncome] = useLocalStorage('income', INCOME_DEFAULT)
   const [fixedExpenses, setFixedExpenses] = useLocalStorage('fixedExpenses', FIXED_EXPENSES_DEFAULT)
@@ -267,21 +274,34 @@ export function AppProvider({ children }) {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   }
 
-  const getMonthlyObligations = () => {
-    const month = getCurrentMonth()
+  const isDebtActiveInMonth = (debt, month) => {
+    if (debt.type === 'prestamo') return true
+    if (debt.type === 'aplazado') return debt.months?.includes(month)
+    return false
+  }
+
+  const getDueFixedExpenses = (refDate = new Date()) =>
+    fixedExpenses.filter(e => e.active && isChargeDue(e.dueDay, refDate))
+
+  const getDueDebts = (refDate = new Date()) => {
+    const month = monthKey(refDate.getFullYear(), refDate.getMonth() + 1)
+    return debts.filter(d => isDebtActiveInMonth(d, month) && isChargeDue(d.dueDay, refDate))
+  }
+
+  const getMonthlyObligations = (refDate = new Date()) => {
     let total = 0
-
-    fixedExpenses.filter(e => e.active).forEach(e => total += e.amount)
-
-    debts.forEach(d => {
-      if (d.type === 'aplazado') {
-        if (d.months && d.months.includes(month)) total += d.monthlyQuota
-      } else if (d.type === 'prestamo') {
-        total += d.monthlyQuota
-      }
-    })
-
+    getDueFixedExpenses(refDate).forEach(e => { total += e.amount })
+    getDueDebts(refDate).forEach(d => { total += d.monthlyQuota })
     return total
+  }
+
+  const hasAutoChargeThisMonth = (type, id, txList = transactions) => {
+    const prefix = getCurrentMonth()
+    return txList.some(t =>
+      t.autoSource?.type === type &&
+      t.autoSource?.id === id &&
+      t.date?.startsWith(prefix)
+    )
   }
 
   const getMonthlyTransactions = (year, month) => {
@@ -298,7 +318,7 @@ export function AppProvider({ children }) {
   }
 
   const addTransaction = (tx) => {
-    const id = Date.now().toString()
+    const id = tx.id || newMoveId()
     const amount = parseFloat(tx.amount)
     const paymentMethod = tx.paymentMethod || 'bank'
     const saved = {
@@ -336,6 +356,42 @@ export function AppProvider({ children }) {
     if (!skipMoveCleanup) removeTransactionMoves(id)
     setTransactions(prev => prev.filter(t => t.id !== id))
   }
+
+  const processAutoCharges = () => {
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = now.getMonth() + 1
+
+    getDueFixedExpenses(now).forEach(e => {
+      if (hasAutoChargeThisMonth('fixed', e.id)) return
+      addTransaction({
+        type: 'expense',
+        amount: e.amount,
+        description: e.name,
+        category: e.category,
+        date: chargeDateFor(year, month, e.dueDay),
+        paymentMethod: e.paymentMethod || 'bank',
+        autoSource: { type: 'fixed', id: e.id },
+      })
+    })
+
+    getDueDebts(now).forEach(d => {
+      if (hasAutoChargeThisMonth('debt', d.id)) return
+      addTransaction({
+        type: 'expense',
+        amount: d.monthlyQuota,
+        description: d.name,
+        category: 'otros',
+        date: chargeDateFor(year, month, d.dueDay),
+        paymentMethod: d.paymentMethod || 'bank',
+        autoSource: { type: 'debt', id: d.id },
+      })
+    })
+  }
+
+  useEffect(() => {
+    processAutoCharges()
+  }, [fixedExpenses, debts, transactions])
 
   const addGoal = (goal) => {
     setGoals(prev => [...prev, { ...goal, id: Date.now().toString(), savedAmount: 0 }])
@@ -520,8 +576,11 @@ export function AppProvider({ children }) {
       cryptoPrices, setCryptoPrices,
       getCurrentMonth,
       getMonthlyObligations,
+      getDueFixedExpenses,
+      getDueDebts,
       getMonthlyTransactions,
       getMonthlySpend,
+      processAutoCharges,
       monthlyHistory, activeMonthKey,
       closeMonth, startFreshMonth, getMonthExpenseTotal, buildMonthSnapshot,
     }}>
