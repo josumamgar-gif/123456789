@@ -67,6 +67,7 @@ export const CATEGORIES_DEFAULT = [
   { id: 'hogar', name: 'Hogar', icon: '🏠', color: '#c96010' },
   { id: 'restaurantes', name: 'Restaurantes', icon: '🍽️', color: '#c9870a' },
   { id: 'otros', name: 'Otros', icon: '📦', color: '#aaa' },
+  { id: 'metas', name: 'Metas / Ahorro', icon: '🎯', color: '#4a6cf7' },
 ]
 
 // Sorare competitions

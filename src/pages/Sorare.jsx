@@ -163,7 +163,7 @@ function CardModal({ card, onClose }) {
           )}
           {paymentMethod === 'apple_pay' && (
             <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>
-              No descuenta del saldo Sorare; queda registrado en movimientos
+              Descuenta del banco principal; queda registrado en movimientos
             </div>
           )}
         </div>
@@ -204,7 +204,7 @@ function CardModal({ card, onClose }) {
 }
 
 function SellModal({ card, onClose }) {
-  const { sellSorareCard, updateSorareCard } = useApp()
+  const { sellSorareCard, updateSorareSellPrice } = useApp()
   const isEdit = card?.status === 'sold'
   const [sellPrice, setSellPrice] = useState(card?.sellPrice || '')
   const [creditToCash, setCreditToCash] = useState(!isEdit)
@@ -212,7 +212,7 @@ function SellModal({ card, onClose }) {
   const handleSell = () => {
     if (!sellPrice) return
     if (isEdit) {
-      updateSorareCard(card.id, { sellPrice: parseFloat(sellPrice) })
+      updateSorareSellPrice(card.id, parseFloat(sellPrice))
     } else {
       sellSorareCard(card.id, parseFloat(sellPrice), creditToCash)
     }
@@ -321,7 +321,7 @@ function FundModal({ onClose }) {
 }
 
 function PrizeModal({ prize, onClose }) {
-  const { addSorarePrize, setSorarePrizes } = useApp()
+  const { addSorarePrize, updateSorarePrize } = useApp()
   const isEdit = !!prize
   const [description, setDescription] = useState(prize?.description || '')
   const [ethAmount, setEthAmount] = useState(prize?.ethAmount || '')
@@ -330,10 +330,11 @@ function PrizeModal({ prize, onClose }) {
   const handleSave = () => {
     if (!description || !ethAmount) return
     if (isEdit) {
-      setSorarePrizes(prev => prev.map(p => p.id === prize.id
-        ? { ...p, description, ethAmount: parseFloat(ethAmount), euroValue: euroValue ? parseFloat(euroValue) : null }
-        : p
-      ))
+      updateSorarePrize(prize.id, {
+        description,
+        ethAmount: parseFloat(ethAmount),
+        euroValue: euroValue ? parseFloat(euroValue) : null,
+      })
     } else {
       addSorarePrize({ description, ethAmount: parseFloat(ethAmount), euroValue: euroValue ? parseFloat(euroValue) : null })
     }
@@ -467,8 +468,8 @@ function RarityGallery({ cards, emptyIcon, emptyText, onSell, onEdit, onDelete }
 
 export default function Sorare() {
   const {
-    sorareCards, deleteSorareCard, updateSorareCard, sellSorareCard,
-    sorarePrizes, setSorarePrizes,
+    sorareCards, deleteSorareCard, updateSorareCard, sellSorareCard, revertSorareSale,
+    sorarePrizes, deleteSorarePrize,
     sorareBalances, sorareBalanceMoves,
     cryptoPrices, setCryptoPrices,
   } = useApp()
@@ -656,7 +657,7 @@ export default function Sorare() {
                             <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 6 }}>
                               <button className="btn btn-ghost" style={{ padding: '4px 9px', fontSize: 11 }} onClick={() => setModal({ type: 'sell', c: card })}>✏️ Editar venta</button>
                               <button className="btn btn-ghost" style={{ padding: '4px 9px', fontSize: 11, color: 'var(--orange)' }}
-                                onClick={() => updateSorareCard(card.id, { status: 'held', sellPrice: null, sellDate: null })}>
+                                onClick={() => revertSorareSale(card.id)}>
                                 Devolver
                               </button>
                             </div>
@@ -745,7 +746,7 @@ export default function Sorare() {
                   {p.euroValue && <div style={{ fontSize: 11, color: 'var(--green)' }}>{fmt(p.euroValue)}€</div>}
                   <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
                     <button onClick={() => setModal({ type: 'editPrize', p })} style={{ fontSize: 10, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}>✏️ Editar</button>
-                    <button onClick={() => setSorarePrizes(prev => prev.filter(x => x.id !== p.id))} style={{ fontSize: 10, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer' }}>Eliminar</button>
+                    <button onClick={() => deleteSorarePrize(p.id)} style={{ fontSize: 10, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer' }}>Eliminar</button>
                   </div>
                 </div>
               </div>

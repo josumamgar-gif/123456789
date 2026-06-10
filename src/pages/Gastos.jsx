@@ -241,7 +241,7 @@ export default function Gastos() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description}</div>
                       <div style={{ fontSize: 11, color: 'var(--text3)' }}>
-                        {[cat?.name, TX_PAYMENT_LABELS[t.paymentMethod || 'bank'], t.autoSource ? 'Auto' : null].filter(Boolean).join(' · ')}
+                        {[cat?.name, TX_PAYMENT_LABELS[t.paymentMethod || 'bank'], t.autoSource?.type === 'goal' ? 'Meta' : t.autoSource ? 'Auto' : null].filter(Boolean).join(' · ')}
                       </div>
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>

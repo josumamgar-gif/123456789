@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useApp } from '../context/AppContext'
 import { differenceInDays, parseISO } from 'date-fns'
+import { TX_PAYMENT_METHODS, TX_PAYMENT_LABELS } from '../data/defaults'
 
 const fmt = (n) => n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const PRIORITY_COLORS = { 1: 'var(--red)', 2: 'var(--orange)', 3: 'var(--yellow)', 4: 'var(--blue)', 5: 'var(--text2)' }
@@ -25,6 +26,8 @@ function GoalModal({ goal, onClose }) {
   const [targetAmount, setTargetAmount] = useState(goal?.targetAmount || '')
   const [deadline, setDeadline] = useState(goal?.deadline || '')
   const [priority, setPriority] = useState(goal?.priority || 3)
+  const [initialSavings, setInitialSavings] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState('bank')
 
   const handleSave = () => {
     if (!name || !targetAmount || !deadline) return
@@ -32,7 +35,11 @@ function GoalModal({ goal, onClose }) {
     if (isEdit) {
       updateGoal(goal.id, data)
     } else {
-      addGoal(data)
+      addGoal({
+        ...data,
+        initialSavings: initialSavings ? parseFloat(initialSavings) : 0,
+        initialPaymentMethod: paymentMethod,
+      })
     }
     onClose()
   }
@@ -67,6 +74,27 @@ function GoalModal({ goal, onClose }) {
           ))}
         </div>
       </div>
+      {!isEdit && (
+        <>
+          <div className="form-group">
+            <label className="form-label">Primer ahorro (€) — opcional</label>
+            <input className="form-input" type="number" min="0" step="0.01" placeholder="0.00" value={initialSavings} onChange={e => setInitialSavings(e.target.value)} />
+            <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>Se registrará como gasto en Gastos y descontará del banco o efectivo.</p>
+          </div>
+          {initialSavings && parseFloat(initialSavings) > 0 && (
+            <div className="form-group">
+              <label className="form-label">Pagado con</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {TX_PAYMENT_METHODS.map(pm => (
+                  <button key={pm} type="button" onClick={() => setPaymentMethod(pm)} style={{ padding: '8px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: '1px solid', borderColor: paymentMethod === pm ? 'var(--accent)' : 'var(--border)', background: paymentMethod === pm ? 'var(--accent-light)' : 'transparent', color: paymentMethod === pm ? 'var(--accent)' : 'var(--text3)' }}>
+                    {TX_PAYMENT_LABELS[pm]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
       <div style={{ display: 'flex', gap: 10 }}>
         <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>Cancelar</button>
         <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleSave}>Guardar</button>
@@ -76,18 +104,15 @@ function GoalModal({ goal, onClose }) {
 }
 
 function AddSavingsModal({ goal, onClose }) {
-  const { updateGoal } = useApp()
+  const { addGoalSavings } = useApp()
   const [amount, setAmount] = useState('')
-  const [mode, setMode] = useState('add') // 'add' | 'set'
+  const [mode, setMode] = useState('add')
+  const [paymentMethod, setPaymentMethod] = useState('bank')
 
   const handleSave = () => {
     const val = parseFloat(amount)
     if (isNaN(val)) return
-    if (mode === 'add') {
-      updateGoal(goal.id, { savedAmount: (goal.savedAmount || 0) + val })
-    } else {
-      updateGoal(goal.id, { savedAmount: val })
-    }
+    if (!addGoalSavings({ goalId: goal.id, amount: val, mode, paymentMethod })) return
     onClose()
   }
 
@@ -106,6 +131,17 @@ function AddSavingsModal({ goal, onClose }) {
       <div className="form-group">
         <label className="form-label">{mode === 'add' ? 'Añadir ahorro (€)' : 'Establecer total ahorrado (€)'}</label>
         <input className="form-input" type="number" min="0" step="0.01" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} />
+      </div>
+      <div className="form-group">
+        <label className="form-label">Pagado con</label>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {TX_PAYMENT_METHODS.map(pm => (
+            <button key={pm} type="button" onClick={() => setPaymentMethod(pm)} style={{ padding: '8px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: '1px solid', borderColor: paymentMethod === pm ? 'var(--accent)' : 'var(--border)', background: paymentMethod === pm ? 'var(--accent-light)' : 'transparent', color: paymentMethod === pm ? 'var(--accent)' : 'var(--text3)' }}>
+              {TX_PAYMENT_LABELS[pm]}
+            </button>
+          ))}
+        </div>
+        <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 8 }}>Se creará un apunte en Gastos y se descontará de tu saldo.</p>
       </div>
       <div style={{ display: 'flex', gap: 10 }}>
         <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>Cancelar</button>

@@ -45,6 +45,7 @@ export function AppProvider({ children }) {
   const [monthlyHistory, setMonthlyHistory] = useLocalStorage('monthlyHistory', [])
   const [activeMonthKey, setActiveMonthKey] = useLocalStorage('activeMonthKey', null)
   const [accountingConfig, setAccountingConfig] = useLocalStorage('accountingConfig', { version: 0 })
+  const [autoChargesDismissed, setAutoChargesDismissed] = useLocalStorage('autoChargesDismissed', [])
 
   const newMoveId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 
@@ -123,7 +124,10 @@ export function AppProvider({ children }) {
     } else {
       if (bankBalance === null) setBankBalance(0)
       if (cashOnHand === null) setCashOnHand(0)
-      if (prev < 2) resetWalletsToZero()
+      if (prev < 2) {
+        clearMonthTracking()
+        resetWalletsToZero()
+      }
     }
     setAccountingConfig({
       version: ACCOUNTING_VERSION,
@@ -143,7 +147,11 @@ export function AppProvider({ children }) {
 
   const applyWalletBalanceDelta = (wallet, delta) => {
     if (!delta) return
-    setWalletBalance(wallet, getWalletBalance(wallet) + delta)
+    if (wallet === 'cash') {
+      setCashOnHand(prev => (prev ?? 0) + delta)
+    } else {
+      setBankBalance(prev => (prev ?? 0) + delta)
+    }
   }
 
   const recordWalletMove = (wallet, move) => {
@@ -259,6 +267,13 @@ export function AppProvider({ children }) {
 
     if (move.category === 'paycheck') setPaycheckMonth(null)
     if (move.transactionId) {
+      const tx = transactions.find(t => t.id === move.transactionId)
+      if (tx) {
+        if (tx.autoSource?.type === 'fixed' || tx.autoSource?.type === 'debt') {
+          dismissAutoCharge(tx.autoSource.type, tx.autoSource.id)
+        }
+        syncGoalFromTransactionDelete(tx)
+      }
       setTransactions(prev => prev.filter(t => t.id !== move.transactionId))
     }
     return true
@@ -274,8 +289,16 @@ export function AppProvider({ children }) {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   }
 
+  const dismissAutoCharge = (type, id) => {
+    const key = `${getCurrentMonth()}:${type}:${id}`
+    setAutoChargesDismissed(prev => (prev.includes(key) ? prev : [...prev, key]))
+  }
+
+  const isAutoChargeDismissed = (type, id) =>
+    autoChargesDismissed.includes(`${getCurrentMonth()}:${type}:${id}`)
+
   const isDebtActiveInMonth = (debt, month) => {
-    if (debt.type === 'prestamo') return true
+    if (debt.type === 'prestamo') return (debt.paid || 0) < (debt.totalAmount || 0)
     if (debt.type === 'aplazado') return debt.months?.includes(month)
     return false
   }
@@ -296,6 +319,7 @@ export function AppProvider({ children }) {
   }
 
   const hasAutoChargeThisMonth = (type, id, txList = transactions) => {
+    if (isAutoChargeDismissed(type, id)) return true
     const prefix = getCurrentMonth()
     return txList.some(t =>
       t.autoSource?.type === type &&
@@ -320,6 +344,7 @@ export function AppProvider({ children }) {
   const addTransaction = (tx) => {
     const id = tx.id || newMoveId()
     const amount = parseFloat(tx.amount)
+    if (isNaN(amount) || amount <= 0) return false
     const paymentMethod = tx.paymentMethod || 'bank'
     const saved = {
       ...tx,
@@ -330,6 +355,33 @@ export function AppProvider({ children }) {
     }
     applyTransactionToWallet(saved, { transactionId: id })
     setTransactions(prev => [saved, ...prev])
+    return true
+  }
+
+  const syncGoalFromTransactionDelete = (tx) => {
+    if (tx?.autoSource?.type !== 'goal') return
+    const goalId = tx.autoSource.id
+    setGoals(prev => prev.map(g => {
+      if (g.id !== goalId) return g
+      const saved = g.savedAmount || 0
+      if (tx.type === 'expense') return { ...g, savedAmount: Math.max(0, saved - tx.amount) }
+      if (tx.type === 'income') return { ...g, savedAmount: Math.max(0, saved + tx.amount) }
+      return g
+    }))
+  }
+
+  const syncGoalFromTransactionUpdate = (oldTx, merged) => {
+    if (oldTx?.autoSource?.type !== 'goal') return
+    const goalId = oldTx.autoSource.id
+    setGoals(prev => prev.map(g => {
+      if (g.id !== goalId) return g
+      let saved = g.savedAmount || 0
+      if (oldTx.type === 'expense') saved -= oldTx.amount
+      else if (oldTx.type === 'income') saved += oldTx.amount
+      if (merged.type === 'expense') saved += merged.amount
+      else if (merged.type === 'income') saved -= merged.amount
+      return { ...g, savedAmount: Math.max(0, saved) }
+    }))
   }
 
   const updateTransaction = (id, updates) => {
@@ -348,11 +400,21 @@ export function AppProvider({ children }) {
         : '',
     }
 
+    if (isNaN(merged.amount) || merged.amount <= 0) return
+
+    syncGoalFromTransactionUpdate(tx, merged)
     applyTransactionToWallet(merged, { transactionId: id })
     setTransactions(prev => prev.map(t => t.id === id ? merged : t))
   }
 
   const deleteTransaction = (id, { skipMoveCleanup = false } = {}) => {
+    const tx = transactions.find(t => t.id === id)
+    if (tx) {
+      if (tx.autoSource?.type === 'fixed' || tx.autoSource?.type === 'debt') {
+        dismissAutoCharge(tx.autoSource.type, tx.autoSource.id)
+      }
+      syncGoalFromTransactionDelete(tx)
+    }
     if (!skipMoveCleanup) removeTransactionMoves(id)
     setTransactions(prev => prev.filter(t => t.id !== id))
   }
@@ -391,17 +453,78 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     processAutoCharges()
-  }, [fixedExpenses, debts, transactions])
+  }, [fixedExpenses, debts])
 
   const addGoal = (goal) => {
-    setGoals(prev => [...prev, { ...goal, id: Date.now().toString(), savedAmount: 0 }])
+    const id = newMoveId()
+    const initial = parseFloat(goal.initialSavings) || 0
+    const { initialSavings, initialPaymentMethod, ...rest } = goal
+    const newGoal = { ...rest, id, savedAmount: 0 }
+    setGoals(prev => [...prev, newGoal])
+    if (initial > 0) {
+      addGoalSavings({ goalId: id, goal: newGoal, amount: initial, mode: 'add', paymentMethod: initialPaymentMethod || 'bank' })
+    }
+    return id
   }
 
   const updateGoal = (id, updates) => {
     setGoals(prev => prev.map(g => g.id === id ? { ...g, ...updates } : g))
   }
 
+  const addGoalSavings = ({ goalId, goal: goalSnapshot, amount, mode = 'add', paymentMethod = 'bank' }) => {
+    const goal = goalSnapshot || goals.find(g => g.id === goalId)
+    if (!goal) return false
+
+    const val = parseFloat(amount)
+    if (isNaN(val)) return false
+
+    const prevSaved = goal.savedAmount || 0
+    let delta = 0
+    let newSaved = prevSaved
+
+    if (mode === 'add') {
+      if (val <= 0) return false
+      delta = val
+      newSaved = prevSaved + val
+    } else {
+      if (val < 0) return false
+      newSaved = val
+      delta = val - prevSaved
+    }
+
+    setGoals(prev => prev.map(g => g.id === goalId ? { ...g, savedAmount: newSaved } : g))
+
+    const today = new Date().toISOString().split('T')[0]
+    const desc = `Meta: ${goal.icon || '🎯'} ${goal.name}`
+
+    if (delta > 0) {
+      addTransaction({
+        type: 'expense',
+        amount: delta,
+        description: desc,
+        category: 'metas',
+        date: today,
+        paymentMethod,
+        autoSource: { type: 'goal', id: goalId },
+      })
+    } else if (delta < 0) {
+      addTransaction({
+        type: 'income',
+        amount: Math.abs(delta),
+        description: `Ajuste ${desc}`,
+        date: today,
+        paymentMethod,
+        autoSource: { type: 'goal', id: goalId },
+      })
+    }
+
+    return true
+  }
+
   const deleteGoal = (id) => {
+    transactions
+      .filter(t => t.autoSource?.type === 'goal' && t.autoSource.id === id)
+      .forEach(t => deleteTransaction(t.id))
     setGoals(prev => prev.filter(g => g.id !== id))
   }
 
@@ -441,8 +564,53 @@ export function AppProvider({ children }) {
     }
   }
 
+  const revertSorareSale = (id) => {
+    const card = sorareCards.find(c => c.id === id)
+    if (!card || card.status !== 'sold') return
+    const price = parseFloat(card.sellPrice) || 0
+    if (price > 0) {
+      applySorareWalletDelta('cash', -price)
+      setSorareBalanceMoves(prev => prev.filter(m => !(m.cardId === id && m.category === 'card_sell')))
+    }
+    updateSorareCard(id, { status: 'held', sellPrice: null, sellDate: null })
+  }
+
+  const updateSorareSellPrice = (id, newPrice) => {
+    const card = sorareCards.find(c => c.id === id)
+    if (!card || card.status !== 'sold') return false
+    const oldPrice = parseFloat(card.sellPrice) || 0
+    const price = parseFloat(newPrice) || 0
+    if (price < 0) return false
+    const delta = price - oldPrice
+    if (delta !== 0) applySorareWalletDelta('cash', delta)
+    updateSorareCard(id, { sellPrice: price })
+    return true
+  }
+
+  const updateSorarePrize = (id, updates) => {
+    const prize = sorarePrizes.find(p => p.id === id)
+    if (!prize) return false
+    const oldEth = parseFloat(prize.ethAmount) || 0
+    const newEth = updates.ethAmount != null ? parseFloat(updates.ethAmount) : oldEth
+    if (isNaN(newEth) || newEth < 0) return false
+    const delta = newEth - oldEth
+    if (delta !== 0) applySorareWalletDelta('eth', delta)
+    setSorarePrizes(prev => prev.map(p => p.id === id ? { ...p, ...updates, ethAmount: newEth } : p))
+    return true
+  }
+
+  const deleteSorarePrize = (id) => {
+    const prize = sorarePrizes.find(p => p.id === id)
+    if (prize) {
+      const eth = parseFloat(prize.ethAmount) || 0
+      if (eth > 0) applySorareWalletDelta('eth', -eth)
+      setSorareBalanceMoves(prev => prev.filter(m => m.prizeId !== id))
+    }
+    setSorarePrizes(prev => prev.filter(p => p.id !== id))
+  }
+
   const addSorareCard = (card) => {
-    const id = Date.now().toString()
+    const id = newMoveId()
     const price = parseFloat(card.buyPrice) || 0
     const ethSpent = parseFloat(card.buyEthAmount) || 0
     const { paymentMethod, player } = card
@@ -523,6 +691,7 @@ export function AppProvider({ children }) {
   }
 
   const addSorarePrize = (prize) => {
+    const id = newMoveId()
     const eth = parseFloat(prize.ethAmount) || 0
     if (eth > 0) {
       applySorareWalletDelta('eth', eth)
@@ -531,10 +700,11 @@ export function AppProvider({ children }) {
         type: 'deposit',
         wallet: 'eth',
         amount: eth,
+        prizeId: id,
         note: prize.description || 'Premio liga',
       })
     }
-    setSorarePrizes(prev => [...prev, { ...prize, id: Date.now().toString(), date: new Date().toISOString() }])
+    setSorarePrizes(prev => [...prev, { ...prize, id, date: new Date().toISOString() }])
   }
 
   const adjustSorareBalance = ({ wallet, amount, type = 'deposit', note = '' }) => {
@@ -566,9 +736,9 @@ export function AppProvider({ children }) {
       setWalletBalanceExact, adjustWalletBalance, deleteWalletMove,
       receivePaycheck, addCashDeposit, paycheckMonth,
       extraIncome, setExtraIncome,
-      goals, addGoal, updateGoal, deleteGoal,
-      sorareCards, addSorareCard, updateSorareCard, sellSorareCard, deleteSorareCard,
-      sorarePrizes, addSorarePrize, setSorarePrizes,
+      goals, addGoal, updateGoal, addGoalSavings, deleteGoal,
+      sorareCards, addSorareCard, updateSorareCard, sellSorareCard, revertSorareSale, updateSorareSellPrice, deleteSorareCard,
+      sorarePrizes, addSorarePrize, updateSorarePrize, deleteSorarePrize, setSorarePrizes,
       sorareCompetitions, setSorareCompetitions,
       sorareBalances, setSorareBalances,
       sorareBalanceMoves,

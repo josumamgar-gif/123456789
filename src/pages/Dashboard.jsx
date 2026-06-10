@@ -530,17 +530,18 @@ function DebtCard() {
 }
 
 export default function Dashboard() {
-  const { income, transactions, getMonthlyObligations, categories } = useApp()
+  const { income, transactions, getMonthlyObligations, categories, bankBalance, cashOnHand } = useApp()
   const obligations = getMonthlyObligations()
-  const available = income - obligations
+  const bank = bankBalance ?? 0
+  const cash = cashOnHand ?? 0
+  const available = bank
   const now = new Date()
 
   const monthTx = transactions.filter(t => {
     const d = new Date(t.date)
     return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && t.type === 'expense'
   })
-  const monthSpend = monthTx.reduce((s, t) => s + t.amount, 0)
-  const remaining = available - monthSpend
+  const remaining = bank + cash
 
   const catSpend = {}
   monthTx.forEach(t => { catSpend[t.category] = (catSpend[t.category] || 0) + t.amount })
@@ -570,12 +571,12 @@ export default function Dashboard() {
           <div style={{ color: 'var(--text3)', fontSize: 10, marginBottom: 3 }}>OBLIGACIONES</div>
           <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--red)' }}>{fmt(obligations)}€</div>
         </div>
-        <div className="card-sm" style={{ borderLeft: '3px solid var(--accent)' }}>
+        <div className="card-sm" style={{ borderLeft: `3px solid ${available >= 0 ? 'var(--blue)' : 'var(--red)'}` }}>
           <div style={{ color: 'var(--text3)', fontSize: 10, marginBottom: 3 }}>DISPONIBLE</div>
-          <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--accent)' }}>{fmt(available)}€</div>
+          <div style={{ fontSize: 17, fontWeight: 600, color: available >= 0 ? 'var(--blue)' : 'var(--red)' }}>{fmt(available)}€</div>
         </div>
-        <div className="card-sm" style={{ borderLeft: `3px solid ${remaining >= 0 ? 'var(--blue)' : 'var(--red)'}` }}>
-          <div style={{ color: 'var(--text3)', fontSize: 10, marginBottom: 3 }}>LIBRE HOY</div>
+        <div className="card-sm" style={{ borderLeft: `3px solid ${remaining >= 0 ? 'var(--accent)' : 'var(--red)'}` }}>
+          <div style={{ color: 'var(--text3)', fontSize: 10, marginBottom: 3 }}>TOTAL (BANCO + EFECTIVO)</div>
           <div style={{ fontSize: 17, fontWeight: 600, color: remaining >= 0 ? 'var(--blue)' : 'var(--red)' }}>{fmt(remaining)}€</div>
         </div>
       </div>
