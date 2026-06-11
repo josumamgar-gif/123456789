@@ -354,49 +354,58 @@ function WalletsCard() {
     }
   }
 
+  const total = (bankBalance ?? 0) + (cashOnHand ?? 0)
+
   const renderWallet = (wallet, balance) => {
     const meta = WALLET_META[wallet]
     return (
-      <button
-        type="button"
-        onClick={() => setModal(wallet)}
-        style={{
-          textAlign: 'left',
-          background: meta.color + '10',
-          border: `1px solid ${meta.color}40`,
-          borderRadius: 10,
-          padding: '12px 14px',
-          cursor: 'pointer',
-        }}
-      >
-        <div style={{ color: 'var(--text3)', fontSize: 10, marginBottom: 4 }}>{meta.label.toUpperCase()}</div>
-        <div style={{ fontSize: 20, fontWeight: 700, color: balance >= 0 ? meta.color : 'var(--red)' }}>{fmt(balance ?? 0)}€</div>
+      <button type="button" className="hero-tile" onClick={() => setModal(wallet)}>
+        <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', marginBottom: 4 }}>
+          {meta.label.toUpperCase()}
+        </div>
+        <div style={{ fontSize: 20, fontWeight: 700, color: '#fff' }}>{fmt(balance ?? 0)}€</div>
       </button>
     )
   }
 
   return (
     <>
-      <div className="card" style={{ marginBottom: 12 }}>
-        <div style={{ color: 'var(--text3)', fontSize: 10, marginBottom: 10 }}>DINERO DEL MES</div>
+      <div className="hero-card" style={{ marginBottom: 12 }}>
+        <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 4 }}>
+          DINERO DEL MES
+        </div>
+        <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 14 }}>
+          {fmt(total)}€
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           {renderWallet('bank', bankBalance)}
           {renderWallet('cash', cashOnHand)}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
           <button
             type="button"
-            className="btn btn-primary"
-            style={{ fontSize: 12, background: paycheckDone ? 'var(--bg3)' : 'var(--green)', color: paycheckDone ? 'var(--text2)' : '#fff', border: paycheckDone ? '1px solid var(--border)' : 'none' }}
+            className="btn"
+            style={{
+              fontSize: 12,
+              background: paycheckDone ? 'rgba(255,255,255,0.16)' : '#fff',
+              color: paycheckDone ? 'rgba(255,255,255,0.85)' : 'var(--accent)',
+              border: paycheckDone ? '1px solid rgba(255,255,255,0.3)' : 'none',
+              fontWeight: 700,
+            }}
             onClick={handlePaycheck}
           >
             {paycheckDone ? '✓ Nómina' : `+ Nómina ${fmt(income)}€`}
           </button>
-          <button type="button" className="btn btn-ghost" style={{ fontSize: 12, color: 'var(--orange)', borderColor: 'var(--orange)' }} onClick={() => setModal('cash-deposit')}>
+          <button
+            type="button"
+            className="btn"
+            style={{ fontSize: 12, background: 'rgba(255,255,255,0.16)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', fontWeight: 700 }}
+            onClick={() => setModal('cash-deposit')}
+          >
             + Efectivo
           </button>
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 10 }}>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 12 }}>
           El mes empieza en 0€. Cobra la nómina y añade el efectivo que tengas.
         </div>
       </div>
@@ -563,22 +572,20 @@ export default function Dashboard() {
 
       {/* Summary cards */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-        <div className="card-sm" style={{ borderLeft: '3px solid var(--green)' }}>
-          <div style={{ color: 'var(--text3)', fontSize: 10, marginBottom: 3 }}>NÓMINA</div>
-          <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--green)' }}>{fmt(income)}€</div>
-        </div>
-        <div className="card-sm" style={{ borderLeft: '3px solid var(--red)' }}>
-          <div style={{ color: 'var(--text3)', fontSize: 10, marginBottom: 3 }}>OBLIGACIONES</div>
-          <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--red)' }}>{fmt(obligations)}€</div>
-        </div>
-        <div className="card-sm" style={{ borderLeft: `3px solid ${available >= 0 ? 'var(--blue)' : 'var(--red)'}` }}>
-          <div style={{ color: 'var(--text3)', fontSize: 10, marginBottom: 3 }}>DISPONIBLE</div>
-          <div style={{ fontSize: 17, fontWeight: 600, color: available >= 0 ? 'var(--blue)' : 'var(--red)' }}>{fmt(available)}€</div>
-        </div>
-        <div className="card-sm" style={{ borderLeft: `3px solid ${remaining >= 0 ? 'var(--accent)' : 'var(--red)'}` }}>
-          <div style={{ color: 'var(--text3)', fontSize: 10, marginBottom: 3 }}>TOTAL (BANCO + EFECTIVO)</div>
-          <div style={{ fontSize: 17, fontWeight: 600, color: remaining >= 0 ? 'var(--blue)' : 'var(--red)' }}>{fmt(remaining)}€</div>
-        </div>
+        {[
+          { icon: '💼', label: 'NÓMINA', value: income, color: 'var(--green)' },
+          { icon: '📌', label: 'OBLIGACIONES', value: obligations, color: 'var(--red)' },
+          { icon: '🏦', label: 'DISPONIBLE', value: available, color: available >= 0 ? 'var(--blue)' : 'var(--red)' },
+          { icon: '💶', label: 'TOTAL (BANCO + EFECTIVO)', value: remaining, color: remaining >= 0 ? 'var(--accent)' : 'var(--red)' },
+        ].map((s, i) => (
+          <div key={i} className="card-sm" style={{ borderLeft: `3px solid ${s.color}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text3)', fontSize: 9.5, fontWeight: 700, letterSpacing: '0.04em', marginBottom: 4 }}>
+              <span style={{ fontSize: 12 }}>{s.icon}</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: s.color }}>{fmt(s.value)}€</div>
+          </div>
+        ))}
       </div>
 
       <GoalsCard />

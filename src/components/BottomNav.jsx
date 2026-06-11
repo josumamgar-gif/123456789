@@ -40,29 +40,23 @@ const ChartIcon = () => (
   </svg>
 )
 
+const NAV_ITEMS = [
+  { to: '/', label: 'Inicio', Icon: HomeIcon, end: true },
+  { to: '/gastos', label: 'Gastos', Icon: WalletIcon },
+  { to: '/metas', label: 'Metas', Icon: TargetIcon },
+  { to: '/sorare', label: 'Sorare', Icon: CardIcon },
+  { to: '/resumen', label: 'Nómina', Icon: ChartIcon },
+]
+
 export default function BottomNav() {
   return (
     <nav className="bottom-nav">
-      <NavLink to="/" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} end>
-        <HomeIcon />
-        <span>Inicio</span>
-      </NavLink>
-      <NavLink to="/gastos" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-        <WalletIcon />
-        <span>Gastos</span>
-      </NavLink>
-      <NavLink to="/metas" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-        <TargetIcon />
-        <span>Metas</span>
-      </NavLink>
-      <NavLink to="/sorare" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-        <CardIcon />
-        <span>Sorare</span>
-      </NavLink>
-      <NavLink to="/resumen" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-        <ChartIcon />
-        <span>Nómina</span>
-      </NavLink>
+      {NAV_ITEMS.map(({ to, label, Icon, end }) => (
+        <NavLink key={to} to={to} end={end} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <span className="nav-icon-wrap"><Icon /></span>
+          <span>{label}</span>
+        </NavLink>
+      ))}
     </nav>
   )
 }
