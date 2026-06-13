@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
+import ThemeToggle from '../components/ThemeToggle'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { format, differenceInDays, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -179,7 +180,7 @@ function ViviendaCard() {
       <div className="progress-bar" style={{ marginBottom: 8 }}>
         <div className="progress-fill" style={{ width: `${pct}%`, background: 'var(--blue)' }} />
       </div>
-      <div style={{ background: '#eef2fd', borderRadius: 7, padding: '8px 10px', fontSize: 12 }}>
+      <div style={{ background: 'var(--info-bg)', borderRadius: 7, padding: '8px 10px', fontSize: 12 }}>
         💡 Te quedan <strong style={{ color: 'var(--accent)' }}>{fmt(remaining)}€</strong> · Mete <strong style={{ color: 'var(--accent)' }}>{fmt(suggested)}€/mes</strong>
       </div>
     </div>
@@ -563,9 +564,12 @@ export default function Dashboard() {
     <div className="page">
       <div className="page-header page-header--row">
         <h1 className="page-title">Patrimonio</h1>
-        <span className="page-header-meta">
-          {now.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
-        </span>
+        <div className="page-header-trailing">
+          <ThemeToggle />
+          <span className="page-header-meta">
+            {now.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+          </span>
+        </div>
       </div>
 
       <WalletsCard />
@@ -600,7 +604,7 @@ export default function Dashboard() {
               <Pie data={pieData} cx="50%" cy="50%" innerRadius={48} outerRadius={74} dataKey="value" paddingAngle={2}>
                 {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
               </Pie>
-              <Tooltip formatter={v => `${fmt(v)}€`} contentStyle={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
+              <Tooltip formatter={v => `${fmt(v)}€`} contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--text)' }} />
             </PieChart>
           </ResponsiveContainer>
           </div>
