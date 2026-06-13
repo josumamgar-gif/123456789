@@ -562,14 +562,14 @@ export default function Dashboard() {
 
   return (
     <div className="page">
-      <div className="page-header page-header--row">
+      <div className="theme-toggle-fixed">
+        <ThemeToggle />
+      </div>
+      <div className="page-header page-header--row page-header--with-theme">
         <h1 className="page-title">Patrimonio</h1>
-        <div className="page-header-trailing">
-          <ThemeToggle />
-          <span className="page-header-meta">
-            {now.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
-          </span>
-        </div>
+        <span className="page-header-meta">
+          {now.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+        </span>
       </div>
 
       <WalletsCard />

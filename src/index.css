@@ -403,6 +403,17 @@ select.form-input option { background: var(--bg2); }
   flex-shrink: 0;
 }
 
+.theme-toggle-fixed {
+  position: fixed;
+  top: calc(var(--safe-top) + 12px);
+  right: var(--app-pad-x);
+  z-index: 60;
+}
+
+.page-header--with-theme {
+  padding-right: 48px;
+}
+
 .page-header-meta {
   color: var(--text3);
   font-size: 12px;
@@ -420,12 +431,12 @@ select.form-input option { background: var(--bg2); }
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: var(--bg2);
-  border: 1px solid var(--border);
-  color: var(--text2);
+  border: 1.5px solid var(--accent);
+  color: var(--accent);
   box-shadow: var(--shadow-sm);
   transition: background 0.15s ease, color 0.15s ease, transform 0.12s ease;
   flex-shrink: 0;
