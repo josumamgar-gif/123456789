@@ -3,10 +3,13 @@ import { useApp } from '../context/AppContext'
 import {
   SORARE_COMPETITIONS,
   SORARE_RARITIES,
+  SORARE_EDITIONS,
   SORARE_PAYMENT_METHODS,
   SORARE_PAYMENT_LABELS,
   RARITY_LABELS,
   RARITY_STYLE,
+  EDITION_LABELS,
+  EDITION_STYLE,
 } from '../data/defaults'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -56,6 +59,7 @@ function CardModal({ card, onClose }) {
   const isEdit = !!card
   const [player, setPlayer] = useState(card?.player || '')
   const [rarity, setRarity] = useState(card?.rarity || 'limited')
+  const [edition, setEdition] = useState(card?.edition || (isEdit ? 'classic' : 'in_season'))
   const [buyPrice, setBuyPrice] = useState(card?.buyPrice ?? '')
   const [buyEthAmount, setBuyEthAmount] = useState(card?.buyEthAmount ?? '')
   const [paymentMethod, setPaymentMethod] = useState(card?.paymentMethod || 'cash')
@@ -83,6 +87,7 @@ function CardModal({ card, onClose }) {
     const data = {
       player,
       rarity,
+      edition,
       buyPrice: parseFloat(buyPrice),
       competitions: selectedComps,
       paymentMethod,
@@ -115,6 +120,22 @@ function CardModal({ card, onClose }) {
               color: rarity === r ? RARITY_STYLE[r].c : 'var(--text3)',
             }}>
               {RARITY_LABELS[r]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">Edición</label>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {SORARE_EDITIONS.map(e => (
+            <button key={e} type="button" onClick={() => setEdition(e)} style={{
+              padding: '8px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: '1px solid',
+              borderColor: edition === e ? EDITION_STYLE[e].border : 'var(--border)',
+              background: edition === e ? EDITION_STYLE[e].bg : 'transparent',
+              color: edition === e ? EDITION_STYLE[e].c : 'var(--text3)',
+            }}>
+              {EDITION_LABELS[e]}
             </button>
           ))}
         </div>
@@ -369,6 +390,8 @@ function PrizeModal({ prize, onClose }) {
 }
 
 function CardItem({ card, onSell, onEdit, onDelete, showPayment }) {
+  const editionKey = card.edition || 'classic'
+
   return (
     <div className="card" style={{ marginBottom: 10, borderLeft: `3px solid ${RARITY_STYLE[card.rarity]?.c || 'var(--border)'}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -376,6 +399,9 @@ function CardItem({ card, onSell, onEdit, onDelete, showPayment }) {
           <div style={{ fontFamily: 'var(--font-head)', fontWeight: 700, fontSize: 15 }}>{card.player}</div>
           <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, marginTop: 4, background: RARITY_STYLE[card.rarity]?.bg, color: RARITY_STYLE[card.rarity]?.c }}>
             {RARITY_LABELS[card.rarity]}
+          </span>
+          <span style={{ display: 'inline-block', marginLeft: 6, padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, marginTop: 4, background: EDITION_STYLE[editionKey]?.bg || 'var(--bg3)', color: EDITION_STYLE[editionKey]?.c || 'var(--text2)' }}>
+            {EDITION_LABELS[editionKey]}
           </span>
           {showPayment && card.paymentMethod && (
             <span style={{ display: 'inline-block', marginLeft: 6, padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: PAYMENT_STYLE[card.paymentMethod]?.bg || 'var(--bg3)', color: PAYMENT_STYLE[card.paymentMethod]?.c || 'var(--text2)' }}>

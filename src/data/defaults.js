@@ -92,6 +92,18 @@ export const SORARE_PAYMENT_LABELS = {
 
 export const SORARE_RARITIES = ['limited', 'rare', 'super_rare', 'unique']
 
+export const SORARE_EDITIONS = ['classic', 'in_season']
+
+export const EDITION_LABELS = {
+  classic: 'Classic',
+  in_season: 'In Season',
+}
+
+export const EDITION_STYLE = {
+  classic: { bg: 'rgba(91,100,120,0.12)', c: 'var(--text2)', border: 'var(--border2)' },
+  in_season: { bg: 'rgba(74,108,247,0.12)', c: 'var(--accent)', border: 'var(--accent)' },
+}
+
 export const RARITY_LABELS = {
   limited: 'Limited',
   rare: 'Rare',
