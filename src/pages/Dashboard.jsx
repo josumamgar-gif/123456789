@@ -6,6 +6,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { format, differenceInDays, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { INVESTMENT_RECS, WALLET_MOVE_LABELS } from '../data/defaults'
+import { getCryptoStats, syncCryptoAsset } from '../utils/cryptoUtils'
 
 const fmt = (n) => n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const GOAL_PRIORITY_COLORS = { 1: 'var(--red)', 2: 'var(--orange)', 3: 'var(--yellow)', 4: 'var(--blue)', 5: 'var(--text2)' }
@@ -28,22 +29,29 @@ function CryptoModal({ asset, onClose }) {
   const [symbol, setSymbol] = useState(asset?.symbol || '')
   const [coinId, setCoinId] = useState(asset?.coinId || '')
   const [name, setName] = useState(asset?.name || '')
-  const [units, setUnits] = useState(asset?.units || '')
-  const [purchasePrice, setPurchasePrice] = useState(asset?.purchasePrice || '')
+  const [units, setUnits] = useState('')
+  const [pricePerUnit, setPricePerUnit] = useState('')
 
   const handleSave = () => {
-    if (!symbol || !coinId || !units || !purchasePrice) return
-    const data = { symbol: symbol.toUpperCase(), coinId, name, units: parseFloat(units), purchasePrice: parseFloat(purchasePrice), active: true }
+    if (!symbol || !coinId || !name) return
     if (isEdit) {
-      setCrypto(prev => prev.map(c => c.id === asset.id ? { ...c, ...data } : c))
+      setCrypto(prev => prev.map(c => c.id === asset.id ? { ...c, symbol: symbol.toUpperCase(), coinId, name } : c))
     } else {
-      setCrypto(prev => [...prev, { id: Date.now().toString(), ...data }])
+      if (!units || !pricePerUnit) return
+      const purchase = {
+        id: Date.now().toString(),
+        units: parseFloat(units),
+        pricePerUnit: parseFloat(pricePerUnit),
+        date: new Date().toISOString(),
+      }
+      const base = { id: (Date.now() + 1).toString(), symbol: symbol.toUpperCase(), coinId, name, active: true, purchases: [purchase] }
+      setCrypto(prev => [...prev, syncCryptoAsset(base, [purchase])])
     }
     onClose()
   }
 
   return (
-    <Modal title={isEdit ? 'Editar activo' : 'Añadir activo cripto'} onClose={onClose}>
+    <Modal title={isEdit ? 'Editar activo' : 'Nueva inversión'} onClose={onClose}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <div className="form-group">
           <label className="form-label">Símbolo</label>
@@ -58,16 +66,23 @@ function CryptoModal({ asset, onClose }) {
         <label className="form-label">Nombre</label>
         <input className="form-input" placeholder="Ethereum" value={name} onChange={e => setName(e.target.value)} />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <div className="form-group">
-          <label className="form-label">Unidades</label>
-          <input className="form-input" type="number" step="0.0001" placeholder="0.195" value={units} onChange={e => setUnits(e.target.value)} />
+      {!isEdit && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div className="form-group">
+            <label className="form-label">Unidades</label>
+            <input className="form-input" type="number" step="0.0001" placeholder="0.195" value={units} onChange={e => setUnits(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Precio compra (€/u)</label>
+            <input className="form-input" type="number" step="0.01" placeholder="1947.68" value={pricePerUnit} onChange={e => setPricePerUnit(e.target.value)} />
+          </div>
         </div>
-        <div className="form-group">
-          <label className="form-label">Precio compra €</label>
-          <input className="form-input" type="number" step="0.01" placeholder="1947.68" value={purchasePrice} onChange={e => setPurchasePrice(e.target.value)} />
+      )}
+      {isEdit && (
+        <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: '10px 12px', marginBottom: 12, fontSize: 12, color: 'var(--text2)' }}>
+          Las unidades y el precio medio se actualizan al añadir aportaciones.
         </div>
-      </div>
+      )}
       <div style={{ display: 'flex', gap: 10 }}>
         <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>Cancelar</button>
         <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleSave}>Guardar</button>
@@ -76,10 +91,63 @@ function CryptoModal({ asset, onClose }) {
   )
 }
 
+function ContributionModal({ asset, onClose }) {
+  const { setCrypto } = useApp()
+  const [units, setUnits] = useState('')
+  const [pricePerUnit, setPricePerUnit] = useState('')
+  const { avgPrice } = getCryptoStats(asset)
+
+  const totalCost = units && pricePerUnit ? parseFloat(units) * parseFloat(pricePerUnit) : null
+
+  const handleSave = () => {
+    if (!units || !pricePerUnit) return
+    const purchase = {
+      id: Date.now().toString(),
+      units: parseFloat(units),
+      pricePerUnit: parseFloat(pricePerUnit),
+      date: new Date().toISOString(),
+    }
+    const purchases = [...getCryptoStats(asset).purchases, purchase]
+    setCrypto(prev => prev.map(c => c.id === asset.id ? syncCryptoAsset(c, purchases) : c))
+    onClose()
+  }
+
+  return (
+    <Modal title={`Aportación — ${asset.symbol}`} onClose={onClose}>
+      <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: '10px 12px', marginBottom: 14, fontSize: 12 }}>
+        Posición actual: <strong>{fmt(getCryptoStats(asset).units)} u</strong>
+        {avgPrice > 0 && (
+          <span style={{ marginLeft: 8, color: 'var(--text3)' }}>· PM {fmt(avgPrice)}€/u</span>
+        )}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div className="form-group">
+          <label className="form-label">Unidades</label>
+          <input className="form-input" type="number" min="0" step="0.0001" placeholder="0.05" value={units} onChange={e => setUnits(e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Precio compra (€/u)</label>
+          <input className="form-input" type="number" min="0" step="0.01" placeholder="0.00" value={pricePerUnit} onChange={e => setPricePerUnit(e.target.value)} />
+        </div>
+      </div>
+      {totalCost !== null && !Number.isNaN(totalCost) && (
+        <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>
+          Importe de esta compra: <strong>{fmt(totalCost)}€</strong>
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 10 }}>
+        <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>Cancelar</button>
+        <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleSave}>Añadir aportación</button>
+      </div>
+    </Modal>
+  )
+}
+
 function CryptoCard() {
   const { crypto, setCrypto, cryptoPrices, setCryptoPrices } = useApp()
   const [loading, setLoading] = useState(false)
-  const [modal, setModal] = useState(null) // null | 'add' | {type:'edit',c}
+  const [modal, setModal] = useState(null) // null | 'add' | {type:'edit',c} | {type:'contribute',c}
+  const [expandedId, setExpandedId] = useState(null)
 
   const fetchPrices = async () => {
     if (!crypto.length) return
@@ -98,7 +166,7 @@ function CryptoCard() {
   return (
     <div className="card" style={{ marginBottom: 12 }}>
       <div className="card-header-row">
-        <span className="section-title" style={{ margin: 0 }}>Cripto</span>
+        <span className="section-title" style={{ margin: 0 }}>Inversiones</span>
         <div className="page-header-actions page-header-actions--2">
           {crypto.length > 0 && (
             <button className="btn btn-ghost btn-sm" onClick={fetchPrices} disabled={loading}>
@@ -114,32 +182,63 @@ function CryptoCard() {
       )}
 
       {crypto.filter(c => c.active).map(c => {
+        const { purchases, units, totalInvested, avgPrice } = getCryptoStats(c)
         const currentPrice = cryptoPrices[c.coinId]
-        const currentValue = currentPrice ? currentPrice * c.units : null
-        const diff = currentValue ? currentValue - c.purchasePrice : null
-        const pct = diff !== null ? (diff / c.purchasePrice) * 100 : null
+        const currentValue = currentPrice ? currentPrice * units : null
+        const diff = currentValue !== null ? currentValue - totalInvested : null
+        const pct = diff !== null && totalInvested > 0 ? (diff / totalInvested) * 100 : null
+        const expanded = expandedId === c.id
+
         return (
-          <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', borderBottom: '1px solid var(--border)' }}>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 14 }}>{c.symbol} <span style={{ fontWeight: 400, color: 'var(--text2)', fontSize: 12 }}>{c.name}</span></div>
-              <div style={{ color: 'var(--text3)', fontSize: 11 }}>{c.units} u · inv. {fmt(c.purchasePrice)}€</div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              {currentValue !== null ? (
-                <>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{fmt(currentValue)}€</div>
-                  <div style={{ fontSize: 11, color: diff >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                    {diff >= 0 ? '+' : ''}{fmt(diff)}€ ({pct >= 0 ? '+' : ''}{pct.toFixed(1)}%)
+          <div key={c.id} style={{ padding: '9px 0', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>{c.symbol} <span style={{ fontWeight: 400, color: 'var(--text2)', fontSize: 12 }}>{c.name}</span></div>
+                <div style={{ color: 'var(--text3)', fontSize: 11 }}>
+                  {fmt(units)} u · PM {fmt(avgPrice)}€ · inv. {fmt(totalInvested)}€
+                </div>
+                {currentPrice != null && (
+                  <div style={{ color: 'var(--text3)', fontSize: 10, marginTop: 2 }}>
+                    Mercado: {fmt(currentPrice)}€/u
                   </div>
-                </>
-              ) : (
-                <span style={{ color: 'var(--text3)', fontSize: 11 }}>Sin precio</span>
-              )}
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 3 }}>
-                <button onClick={() => setModal({ type: 'edit', c })} style={{ fontSize: 10, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}>✏️ Editar</button>
-                <button onClick={() => setCrypto(prev => prev.filter(x => x.id !== c.id))} style={{ fontSize: 10, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer' }}>Eliminar</button>
+                )}
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
+                {currentValue !== null ? (
+                  <>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{fmt(currentValue)}€</div>
+                    <div style={{ fontSize: 11, color: diff >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                      {diff >= 0 ? '+' : ''}{fmt(diff)}€ ({pct >= 0 ? '+' : ''}{pct.toFixed(1)}%)
+                    </div>
+                  </>
+                ) : (
+                  <span style={{ color: 'var(--text3)', fontSize: 11 }}>Sin precio</span>
+                )}
+                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 4, flexWrap: 'wrap' }}>
+                  <button className="btn btn-ghost" style={{ padding: '4px 9px', fontSize: 11, color: 'var(--accent)' }} onClick={() => setModal({ type: 'contribute', c })}>+ Aportar</button>
+                  <button onClick={() => setExpandedId(expanded ? null : c.id)} style={{ fontSize: 10, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                    {expanded ? '▲' : '▼'} {purchases.length}
+                  </button>
+                  <button onClick={() => setModal({ type: 'edit', c })} style={{ fontSize: 10, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}>✏️</button>
+                  <button onClick={() => setCrypto(prev => prev.filter(x => x.id !== c.id))} style={{ fontSize: 10, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
+                </div>
               </div>
             </div>
+            {expanded && (
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed var(--border)' }}>
+                {purchases.map((p, i) => (
+                  <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text2)', padding: '4px 0' }}>
+                    <span>
+                      Compra {i + 1}
+                      {p.date && <span style={{ color: 'var(--text3)', marginLeft: 6 }}>{format(new Date(p.date), 'd MMM yyyy', { locale: es })}</span>}
+                    </span>
+                    <span>
+                      {fmt(p.units)} u × {fmt(p.pricePerUnit)}€ = <strong>{fmt(p.units * p.pricePerUnit)}€</strong>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )
       })}
@@ -150,8 +249,9 @@ function CryptoCard() {
         </div>
       )}
 
-      {modal === 'add'           && <CryptoModal asset={null}    onClose={() => setModal(null)} />}
-      {modal?.type === 'edit'    && <CryptoModal asset={modal.c} onClose={() => setModal(null)} />}
+      {modal === 'add'                    && <CryptoModal asset={null}           onClose={() => setModal(null)} />}
+      {modal?.type === 'edit'             && <CryptoModal asset={modal.c}        onClose={() => setModal(null)} />}
+      {modal?.type === 'contribute'       && <ContributionModal asset={modal.c} onClose={() => setModal(null)} />}
     </div>
   )
 }
