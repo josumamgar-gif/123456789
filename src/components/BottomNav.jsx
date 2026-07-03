@@ -28,7 +28,6 @@ const CardIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="2" y="3" width="20" height="14" rx="2"/>
     <path d="M8 21h8M12 17v4"/>
-    <path d="M7 8h.01M11 8h.01M15 8h.01"/>
   </svg>
 )
 
@@ -40,12 +39,20 @@ const ChartIcon = () => (
   </svg>
 )
 
+const TrendIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+    <polyline points="17 6 23 6 23 12"/>
+  </svg>
+)
+
 const NAV_ITEMS = [
   { to: '/', label: 'Inicio', Icon: HomeIcon, end: true },
   { to: '/gastos', label: 'Gastos', Icon: WalletIcon },
   { to: '/metas', label: 'Metas', Icon: TargetIcon },
   { to: '/sorare', label: 'Sorare', Icon: CardIcon },
   { to: '/resumen', label: 'Nómina', Icon: ChartIcon },
+  { to: '/inversion', label: 'Inversión', Icon: TrendIcon },
 ]
 
 export default function BottomNav() {

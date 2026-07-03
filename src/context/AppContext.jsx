@@ -27,6 +27,7 @@ export function AppProvider({ children }) {
   const [debts, setDebts] = useLocalStorage('debts', DEBTS_DEFAULT)
   const [vivienda, setVivienda] = useLocalStorage('vivienda', VIVIENDA_DEFAULT)
   const [crypto, setCrypto] = useLocalStorage('crypto', CRYPTO_DEFAULT)
+  const [investments, setInvestments] = useLocalStorage('investments', null)
   const [categories, setCategories] = useLocalStorage('categories', CATEGORIES_DEFAULT)
   const [transactions, setTransactions] = useLocalStorage('transactions', [])
   const [extraIncome, setExtraIncome] = useLocalStorage('extraIncome', [])
@@ -134,6 +135,16 @@ export function AppProvider({ children }) {
       startedAt: accountingConfig.startedAt || new Date().toISOString(),
     })
   }, [])
+
+  useEffect(() => {
+    if (categories.some(c => c.id === 'sorare')) return
+    setCategories(prev => [...prev, { id: 'sorare', name: 'Sorare', icon: '⚽', color: '#7c4dff' }])
+  }, [])
+
+  useEffect(() => {
+    if (investments !== null) return
+    setInvestments((crypto || []).map(c => ({ ...c, type: c.type || 'crypto', active: c.active !== false })))
+  }, [investments, crypto, setInvestments])
 
   const getWalletBalance = (wallet) => {
     const val = wallet === 'cash' ? cashOnHand : bankBalance
@@ -341,7 +352,7 @@ export function AppProvider({ children }) {
       .reduce((sum, t) => sum + t.amount, 0)
   }
 
-  const addTransaction = (tx) => {
+  const addTransaction = (tx, { skipWalletApply = false } = {}) => {
     const id = tx.id || newMoveId()
     const amount = parseFloat(tx.amount)
     if (isNaN(amount) || amount <= 0) return false
@@ -353,7 +364,7 @@ export function AppProvider({ children }) {
       paymentMethod,
       category: tx.type === 'expense' ? tx.category : '',
     }
-    applyTransactionToWallet(saved, { transactionId: id })
+    if (!skipWalletApply) applyTransactionToWallet(saved, { transactionId: id })
     setTransactions(prev => [saved, ...prev])
     return true
   }
@@ -537,12 +548,29 @@ export function AppProvider({ children }) {
     }))
   }
 
+  const getSorareTransactions = () =>
+    transactions.filter(t => t.category === 'sorare' || t.autoSource?.type === 'sorare')
+
+  const linkSorareGasto = ({ txType, amount, description, paymentMethod = 'bank', refId, skipWalletApply = false }) => {
+    const val = parseFloat(amount)
+    if (!val || val <= 0) return
+    addTransaction({
+      type: txType,
+      amount: val,
+      description,
+      category: 'sorare',
+      date: new Date().toISOString().split('T')[0],
+      paymentMethod,
+      autoSource: { type: 'sorare', id: refId },
+    }, { skipWalletApply })
+  }
+
   const recordSorareMove = (move) => {
     setSorareBalanceMoves(prev => [...prev, {
-      id: newMoveId(),
       date: new Date().toISOString(),
       category: 'manual',
       ...move,
+      id: move.id || newMoveId(),
     }])
   }
 
@@ -648,6 +676,14 @@ export function AppProvider({ children }) {
         player,
         note: `Apple Pay: ${player}`,
       })
+      linkSorareGasto({
+        txType: 'expense',
+        amount: price,
+        description: `Sorare · ${player}`,
+        paymentMethod: 'bank',
+        refId: id,
+        skipWalletApply: true,
+      })
     }
 
     setSorareCards(prev => [...prev, {
@@ -707,18 +743,29 @@ export function AppProvider({ children }) {
     setSorarePrizes(prev => [...prev, { ...prize, id, date: new Date().toISOString() }])
   }
 
-  const adjustSorareBalance = ({ wallet, amount, type = 'deposit', note = '' }) => {
+  const adjustSorareBalance = ({ wallet, amount, type = 'deposit', note = '', linkToGastos = true }) => {
     const amt = parseFloat(amount)
     if (!amt || amt <= 0 || !['cash', 'eth'].includes(wallet)) return false
     const delta = type === 'withdraw' ? -amt : amt
+    const moveId = newMoveId()
     applySorareWalletDelta(wallet, delta)
     recordSorareMove({
+      id: moveId,
       category: 'manual',
       wallet,
       amount: amt,
       type,
-      note,
+      note: note || (type === 'deposit' ? 'Inyección' : 'Retirada'),
     })
+    if (linkToGastos && wallet === 'cash') {
+      linkSorareGasto({
+        txType: type === 'deposit' ? 'expense' : 'income',
+        amount: amt,
+        description: note || (type === 'deposit' ? 'Inyección Sorare' : 'Retirada Sorare'),
+        paymentMethod: 'bank',
+        refId: moveId,
+      })
+    }
     return true
   }
 
@@ -729,6 +776,7 @@ export function AppProvider({ children }) {
       debts, setDebts,
       vivienda, setVivienda,
       crypto, setCrypto,
+      investments, setInvestments,
       categories, setCategories,
       transactions, addTransaction, updateTransaction, deleteTransaction,
       bankBalance, cashOnHand,
@@ -743,6 +791,7 @@ export function AppProvider({ children }) {
       sorareBalances, setSorareBalances,
       sorareBalanceMoves,
       adjustSorareBalance,
+      getSorareTransactions,
       cryptoPrices, setCryptoPrices,
       getCurrentMonth,
       getMonthlyObligations,

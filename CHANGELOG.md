@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.0.0] — 2026-07-03
+
+### Nueva estructura (6 pestañas)
+- **Inversión**: pestaña dedicada para cripto, acciones y fondos
+- **Inicio** simplificado: sin deudas ni activos recomendados; resumen de inversiones
+- **Gastos** con añadir rápido (importe + tarjeta/efectivo en pocos pasos)
+- **Sorare** rediseñado con pestaña Gastos vinculada a movimientos de dinero
+
+### Funcionalidades
+- Inyecciones/retiradas Cash Sorare y compras Apple Pay crean apuntes en Gastos
+- Portfolio de inversiones con filtros y precios cripto (CoinGecko)
+- Componentes compartidos Modal y QuickAddExpense
+
 ## [1.4.0] — 2026-06-11
 
 ### Diseño

@@ -8,6 +8,7 @@ import Gastos from './pages/Gastos'
 import Metas from './pages/Metas'
 import Sorare from './pages/Sorare'
 import Resumen from './pages/Resumen'
+import Inversion from './pages/Inversion'
 
 function useKeyboardOnInputOnly() {
   useEffect(() => {
@@ -39,6 +40,7 @@ export default function App() {
               <Route path="/metas" element={<Metas />} />
               <Route path="/sorare" element={<Sorare />} />
               <Route path="/resumen" element={<Resumen />} />
+              <Route path="/inversion" element={<Inversion />} />
             </Routes>
             <BottomNav />
           </div>

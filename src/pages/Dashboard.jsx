@@ -5,253 +5,43 @@ import ThemeToggle from '../components/ThemeToggle'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { format, differenceInDays, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { INVESTMENT_RECS, WALLET_MOVE_LABELS } from '../data/defaults'
-import { getCryptoStats, syncCryptoAsset } from '../utils/cryptoUtils'
+import { WALLET_MOVE_LABELS, INVESTMENT_TYPE_LABELS } from '../data/defaults'
+import Modal from '../components/Modal'
 
 const fmt = (n) => n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const GOAL_PRIORITY_COLORS = { 1: 'var(--red)', 2: 'var(--orange)', 3: 'var(--yellow)', 4: 'var(--blue)', 5: 'var(--text2)' }
 
-function Modal({ title, onClose, children }) {
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-sheet" onClick={e => e.stopPropagation()}>
-        <div className="modal-handle" />
-        <h2 style={{ fontFamily: 'var(--font-head)', fontSize: 18, fontWeight: 700, marginBottom: 16 }}>{title}</h2>
-        {children}
-      </div>
-    </div>
-  )
-}
-
-function CryptoModal({ asset, onClose }) {
-  const { crypto, setCrypto } = useApp()
-  const isEdit = !!asset
-  const [symbol, setSymbol] = useState(asset?.symbol || '')
-  const [coinId, setCoinId] = useState(asset?.coinId || '')
-  const [name, setName] = useState(asset?.name || '')
-  const [units, setUnits] = useState('')
-  const [pricePerUnit, setPricePerUnit] = useState('')
-
-  const handleSave = () => {
-    if (!symbol || !coinId || !name) return
-    if (isEdit) {
-      setCrypto(prev => prev.map(c => c.id === asset.id ? { ...c, symbol: symbol.toUpperCase(), coinId, name } : c))
-    } else {
-      if (!units || !pricePerUnit) return
-      const purchase = {
-        id: Date.now().toString(),
-        units: parseFloat(units),
-        pricePerUnit: parseFloat(pricePerUnit),
-        date: new Date().toISOString(),
-      }
-      const base = { id: (Date.now() + 1).toString(), symbol: symbol.toUpperCase(), coinId, name, active: true, purchases: [purchase] }
-      setCrypto(prev => [...prev, syncCryptoAsset(base, [purchase])])
-    }
-    onClose()
-  }
-
-  return (
-    <Modal title={isEdit ? 'Editar activo' : 'Nueva inversión'} onClose={onClose}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <div className="form-group">
-          <label className="form-label">Símbolo</label>
-          <input className="form-input" placeholder="ETH" value={symbol} onChange={e => setSymbol(e.target.value)} />
-        </div>
-        <div className="form-group">
-          <label className="form-label">ID CoinGecko</label>
-          <input className="form-input" placeholder="ethereum" value={coinId} onChange={e => setCoinId(e.target.value)} />
-        </div>
-      </div>
-      <div className="form-group">
-        <label className="form-label">Nombre</label>
-        <input className="form-input" placeholder="Ethereum" value={name} onChange={e => setName(e.target.value)} />
-      </div>
-      {!isEdit && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <div className="form-group">
-            <label className="form-label">Unidades</label>
-            <input className="form-input" type="number" step="0.0001" placeholder="0.195" value={units} onChange={e => setUnits(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Precio compra (€/u)</label>
-            <input className="form-input" type="number" step="0.01" placeholder="1947.68" value={pricePerUnit} onChange={e => setPricePerUnit(e.target.value)} />
-          </div>
-        </div>
-      )}
-      {isEdit && (
-        <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: '10px 12px', marginBottom: 12, fontSize: 12, color: 'var(--text2)' }}>
-          Las unidades y el precio medio se actualizan al añadir aportaciones.
-        </div>
-      )}
-      <div style={{ display: 'flex', gap: 10 }}>
-        <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>Cancelar</button>
-        <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleSave}>Guardar</button>
-      </div>
-    </Modal>
-  )
-}
-
-function ContributionModal({ asset, onClose }) {
-  const { setCrypto } = useApp()
-  const [units, setUnits] = useState('')
-  const [pricePerUnit, setPricePerUnit] = useState('')
-  const { avgPrice } = getCryptoStats(asset)
-
-  const totalCost = units && pricePerUnit ? parseFloat(units) * parseFloat(pricePerUnit) : null
-
-  const handleSave = () => {
-    if (!units || !pricePerUnit) return
-    const purchase = {
-      id: Date.now().toString(),
-      units: parseFloat(units),
-      pricePerUnit: parseFloat(pricePerUnit),
-      date: new Date().toISOString(),
-    }
-    const purchases = [...getCryptoStats(asset).purchases, purchase]
-    setCrypto(prev => prev.map(c => c.id === asset.id ? syncCryptoAsset(c, purchases) : c))
-    onClose()
-  }
-
-  return (
-    <Modal title={`Aportación — ${asset.symbol}`} onClose={onClose}>
-      <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: '10px 12px', marginBottom: 14, fontSize: 12 }}>
-        Posición actual: <strong>{fmt(getCryptoStats(asset).units)} u</strong>
-        {avgPrice > 0 && (
-          <span style={{ marginLeft: 8, color: 'var(--text3)' }}>· PM {fmt(avgPrice)}€/u</span>
-        )}
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <div className="form-group">
-          <label className="form-label">Unidades</label>
-          <input className="form-input" type="number" min="0" step="0.0001" placeholder="0.05" value={units} onChange={e => setUnits(e.target.value)} />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Precio compra (€/u)</label>
-          <input className="form-input" type="number" min="0" step="0.01" placeholder="0.00" value={pricePerUnit} onChange={e => setPricePerUnit(e.target.value)} />
-        </div>
-      </div>
-      {totalCost !== null && !Number.isNaN(totalCost) && (
-        <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>
-          Importe de esta compra: <strong>{fmt(totalCost)}€</strong>
-        </div>
-      )}
-      <div style={{ display: 'flex', gap: 10 }}>
-        <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>Cancelar</button>
-        <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleSave}>Añadir aportación</button>
-      </div>
-    </Modal>
-  )
-}
-
-function CryptoCard() {
-  const { crypto, setCrypto, cryptoPrices, setCryptoPrices } = useApp()
-  const [loading, setLoading] = useState(false)
-  const [modal, setModal] = useState(null) // null | 'add' | {type:'edit',c} | {type:'contribute',c}
-  const [expandedId, setExpandedId] = useState(null)
-
-  const fetchPrices = async () => {
-    if (!crypto.length) return
-    setLoading(true)
-    try {
-      const ids = crypto.filter(c => c.active).map(c => c.coinId).join(',')
-      const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=eur`)
-      const data = await res.json()
-      const prices = {}
-      crypto.forEach(c => { if (data[c.coinId]) prices[c.coinId] = data[c.coinId].eur })
-      setCryptoPrices({ ...cryptoPrices, ...prices, updatedAt: new Date().toISOString() })
-    } catch { alert('No se pudo obtener precio.') }
-    setLoading(false)
-  }
+function InvestmentsPreview() {
+  const { investments, cryptoPrices } = useApp()
+  const list = (investments || []).filter(i => i.active !== false).slice(0, 4)
+  const all = (investments || []).filter(i => i.active !== false)
+  let total = 0
+  all.forEach(i => {
+    if (i.type === 'crypto' && i.coinId && cryptoPrices[i.coinId]) total += cryptoPrices[i.coinId] * i.units
+    else total += i.purchasePrice || 0
+  })
 
   return (
     <div className="card" style={{ marginBottom: 12 }}>
-      <div className="card-header-row">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <span className="section-title" style={{ margin: 0 }}>Inversiones</span>
-        <div className="page-header-actions page-header-actions--2">
-          {crypto.length > 0 && (
-            <button className="btn btn-ghost btn-sm" onClick={fetchPrices} disabled={loading}>
-              {loading ? '…' : '↻ Precios'}
-            </button>
-          )}
-          <button className="btn btn-ghost btn-sm" onClick={() => setModal('add')}>+ Añadir</button>
-        </div>
+        <Link to="/inversion" className="btn btn-ghost btn-sm">Ver todo</Link>
       </div>
-
-      {crypto.length === 0 && (
-        <div style={{ color: 'var(--text3)', fontSize: 12, textAlign: 'center', padding: '12px 0' }}>Sin activos. Pulsa + Añadir.</div>
-      )}
-
-      {crypto.filter(c => c.active).map(c => {
-        const { purchases, units, totalInvested, avgPrice } = getCryptoStats(c)
-        const currentPrice = cryptoPrices[c.coinId]
-        const currentValue = currentPrice ? currentPrice * units : null
-        const diff = currentValue !== null ? currentValue - totalInvested : null
-        const pct = diff !== null && totalInvested > 0 ? (diff / totalInvested) * 100 : null
-        const expanded = expandedId === c.id
-
-        return (
-          <div key={c.id} style={{ padding: '9px 0', borderBottom: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>{c.symbol} <span style={{ fontWeight: 400, color: 'var(--text2)', fontSize: 12 }}>{c.name}</span></div>
-                <div style={{ color: 'var(--text3)', fontSize: 11 }}>
-                  {fmt(units)} u · PM {fmt(avgPrice)}€ · inv. {fmt(totalInvested)}€
-                </div>
-                {currentPrice != null && (
-                  <div style={{ color: 'var(--text3)', fontSize: 10, marginTop: 2 }}>
-                    Mercado: {fmt(currentPrice)}€/u
-                  </div>
-                )}
-              </div>
-              <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
-                {currentValue !== null ? (
-                  <>
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>{fmt(currentValue)}€</div>
-                    <div style={{ fontSize: 11, color: diff >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                      {diff >= 0 ? '+' : ''}{fmt(diff)}€ ({pct >= 0 ? '+' : ''}{pct.toFixed(1)}%)
-                    </div>
-                  </>
-                ) : (
-                  <span style={{ color: 'var(--text3)', fontSize: 11 }}>Sin precio</span>
-                )}
-                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 4, flexWrap: 'wrap' }}>
-                  <button className="btn btn-ghost" style={{ padding: '4px 9px', fontSize: 11, color: 'var(--accent)' }} onClick={() => setModal({ type: 'contribute', c })}>+ Aportar</button>
-                  <button onClick={() => setExpandedId(expanded ? null : c.id)} style={{ fontSize: 10, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer' }}>
-                    {expanded ? '▲' : '▼'} {purchases.length}
-                  </button>
-                  <button onClick={() => setModal({ type: 'edit', c })} style={{ fontSize: 10, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}>✏️</button>
-                  <button onClick={() => setCrypto(prev => prev.filter(x => x.id !== c.id))} style={{ fontSize: 10, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
-                </div>
-              </div>
-            </div>
-            {expanded && (
-              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed var(--border)' }}>
-                {purchases.map((p, i) => (
-                  <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text2)', padding: '4px 0' }}>
-                    <span>
-                      Compra {i + 1}
-                      {p.date && <span style={{ color: 'var(--text3)', marginLeft: 6 }}>{format(new Date(p.date), 'd MMM yyyy', { locale: es })}</span>}
-                    </span>
-                    <span>
-                      {fmt(p.units)} u × {fmt(p.pricePerUnit)}€ = <strong>{fmt(p.units * p.pricePerUnit)}€</strong>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )
-      })}
-
-      {cryptoPrices.updatedAt && (
-        <div style={{ color: 'var(--text3)', fontSize: 10, marginTop: 8 }}>
-          Actualizado: {new Date(cryptoPrices.updatedAt).toLocaleTimeString('es-ES')}
+      {all.length === 0 ? (
+        <div style={{ textAlign: 'center', color: 'var(--text3)', fontSize: 13, padding: '8px 0' }}>
+          Sin inversiones. <Link to="/inversion" style={{ color: 'var(--accent)', fontWeight: 600 }}>Añadir</Link>
         </div>
+      ) : (
+        <>
+          <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 10 }}>{fmt(total)}€</div>
+          {list.map(i => (
+            <div key={i.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderTop: '1px solid var(--border)' }}>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>{i.symbol} <span style={{ fontWeight: 400, color: 'var(--text2)' }}>{INVESTMENT_TYPE_LABELS[i.type]}</span></span>
+              <span style={{ fontSize: 13 }}>{fmt(i.purchasePrice)}€</span>
+            </div>
+          ))}
+        </>
       )}
-
-      {modal === 'add'                    && <CryptoModal asset={null}           onClose={() => setModal(null)} />}
-      {modal?.type === 'edit'             && <CryptoModal asset={modal.c}        onClose={() => setModal(null)} />}
-      {modal?.type === 'contribute'       && <ContributionModal asset={modal.c} onClose={() => setModal(null)} />}
     </div>
   )
 }
@@ -280,7 +70,7 @@ function ViviendaCard() {
       <div className="progress-bar" style={{ marginBottom: 8 }}>
         <div className="progress-fill" style={{ width: `${pct}%`, background: 'var(--blue)' }} />
       </div>
-      <div style={{ background: 'var(--info-bg)', borderRadius: 7, padding: '8px 10px', fontSize: 12 }}>
+      <div style={{ background: '#eef2fd', borderRadius: 7, padding: '8px 10px', fontSize: 12 }}>
         💡 Te quedan <strong style={{ color: 'var(--accent)' }}>{fmt(remaining)}€</strong> · Mete <strong style={{ color: 'var(--accent)' }}>{fmt(suggested)}€/mes</strong>
       </div>
     </div>
@@ -584,61 +374,6 @@ function GoalsCard() {
   )
 }
 
-function DebtCard() {
-  const { debts, getDueDebts } = useApp()
-  const now = new Date()
-  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const isDue = (dueDay) => now.getDate() >= (dueDay || 1)
-  const loan = debts.find(d => d.id === 'prestamo')
-  const pct = loan ? (loan.paid / loan.totalAmount) * 100 : 0
-  const activeAplazados = debts.filter(d => d.type === 'aplazado' && d.months?.includes(month))
-  const dueDebts = getDueDebts(now)
-
-  if (!loan && !activeAplazados.length) return null
-
-  return (
-    <div className="card" style={{ marginBottom: 12 }}>
-      <span className="section-title">Deudas activas</span>
-      {loan && (
-        <div style={{ marginBottom: 10 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-            <span style={{ fontSize: 13 }}>
-              {loan.name}
-              <span style={{ display: 'block', fontSize: 10, color: isDue(loan.dueDay) ? 'var(--text3)' : 'var(--yellow)' }}>
-                Día {loan.dueDay || 1}{!isDue(loan.dueDay) ? ' · Pendiente' : ''}
-              </span>
-            </span>
-            <span style={{ fontSize: 13, color: 'var(--red)', fontWeight: 600 }}>-{fmt(loan.monthlyQuota)}€/mes</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-            <span style={{ color: 'var(--text3)', fontSize: 11 }}>Pagado: {fmt(loan.paid || 0)}€ de {fmt(loan.totalAmount)}€</span>
-            <span style={{ color: 'var(--text3)', fontSize: 11 }}>Vence {loan.endDate}</span>
-          </div>
-          <div className="progress-bar">
-            <div className="progress-fill" style={{ width: `${pct}%`, background: 'var(--accent)' }} />
-          </div>
-        </div>
-      )}
-      {activeAplazados.map(d => (
-        <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: '1px solid var(--border)' }}>
-          <span style={{ fontSize: 13 }}>
-            {d.name}
-            <span style={{ display: 'block', fontSize: 10, color: isDue(d.dueDay) ? 'var(--text3)' : 'var(--yellow)' }}>
-              Día {d.dueDay || 1}{!isDue(d.dueDay) ? ' · Pendiente' : ''}
-            </span>
-          </span>
-          <span style={{ fontSize: 13, color: isDue(d.dueDay) ? 'var(--red)' : 'var(--text3)', fontWeight: 600 }}>-{fmt(d.monthlyQuota)}€</span>
-        </div>
-      ))}
-      {dueDebts.length > 0 && (
-        <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
-          Cuotas ya cargadas este mes: -{fmt(dueDebts.reduce((s, d) => s + d.monthlyQuota, 0))}€
-        </div>
-      )}
-    </div>
-  )
-}
-
 export default function Dashboard() {
   const { income, transactions, getMonthlyObligations, categories, bankBalance, cashOnHand } = useApp()
   const obligations = getMonthlyObligations()
@@ -662,14 +397,14 @@ export default function Dashboard() {
 
   return (
     <div className="page">
-      <div className="theme-toggle-fixed">
-        <ThemeToggle />
-      </div>
-      <div className="page-header page-header--row page-header--with-theme">
+      <div className="page-header page-header--row">
         <h1 className="page-title">Patrimonio</h1>
-        <span className="page-header-meta">
-          {now.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className="page-header-meta">
+            {now.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+          </span>
+          <ThemeToggle />
+        </div>
       </div>
 
       <WalletsCard />
@@ -704,7 +439,7 @@ export default function Dashboard() {
               <Pie data={pieData} cx="50%" cy="50%" innerRadius={48} outerRadius={74} dataKey="value" paddingAngle={2}>
                 {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
               </Pie>
-              <Tooltip formatter={v => `${fmt(v)}€`} contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--text)' }} />
+              <Tooltip formatter={v => `${fmt(v)}€`} contentStyle={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
             </PieChart>
           </ResponsiveContainer>
           </div>
@@ -726,26 +461,7 @@ export default function Dashboard() {
       )}
 
       <ViviendaCard />
-      <DebtCard />
-      <CryptoCard />
-
-      {/* Investment recommendations */}
-      <div className="card">
-        <span className="section-title">Activos recomendados</span>
-        {INVESTMENT_RECS.map((r, i) => (
-          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: i < INVESTMENT_RECS.length - 1 ? '1px solid var(--border)' : 'none' }}>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 13 }}>{r.symbol} <span style={{ fontWeight: 400, color: 'var(--text2)', fontSize: 12 }}>— {r.name}</span></div>
-              <div style={{ color: 'var(--text3)', fontSize: 11 }}>{r.reason}</div>
-            </div>
-            <span style={{ fontSize: 10, padding: '3px 7px', borderRadius: 4, fontWeight: 600,
-              background: r.risk === 'bajo' ? '#e8f7ee' : r.risk === 'medio' ? '#fdf5e3' : '#fdeaea',
-              color: r.risk === 'bajo' ? 'var(--green)' : r.risk === 'medio' ? 'var(--yellow)' : 'var(--red)' }}>
-              {r.risk.toUpperCase()}
-            </span>
-          </div>
-        ))}
-      </div>
+      <InvestmentsPreview />
     </div>
   )
 }

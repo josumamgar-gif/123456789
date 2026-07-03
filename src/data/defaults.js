@@ -68,6 +68,7 @@ export const CATEGORIES_DEFAULT = [
   { id: 'restaurantes', name: 'Restaurantes', icon: '🍽️', color: '#c9870a' },
   { id: 'otros', name: 'Otros', icon: '📦', color: '#aaa' },
   { id: 'metas', name: 'Metas / Ahorro', icon: '🎯', color: '#4a6cf7' },
+  { id: 'sorare', name: 'Sorare', icon: '⚽', color: '#7c4dff' },
 ]
 
 // Sorare competitions
@@ -117,6 +118,18 @@ export const RARITY_STYLE = {
   rare:       { bg: 'rgba(224,61,61,0.12)',  c: '#e03d3d' },
   super_rare: { bg: 'rgba(59,111,240,0.12)', c: '#3b6ff0' },
   unique:     { bg: 'rgba(124,77,255,0.12)', c: '#7c4dff' },
+}
+
+export const INVESTMENT_TYPES = [
+  { id: 'crypto', label: 'Cripto', icon: '₿' },
+  { id: 'stock', label: 'Acciones', icon: '📈' },
+  { id: 'fund', label: 'Fondos', icon: '🏦' },
+]
+
+export const INVESTMENT_TYPE_LABELS = {
+  crypto: 'Cripto',
+  stock: 'Acciones',
+  fund: 'Fondos',
 }
 
 export const INCOME_DEFAULT = 2400
