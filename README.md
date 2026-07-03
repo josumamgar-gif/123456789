@@ -1,28 +1,34 @@
 # Patrimonio — App de gestión personal
 
-**Versión 1.2**
+**Versión 1.4.0**
 
-App móvil-first para gestión de patrimonio personal. React + Vite, datos en localStorage.
+App móvil-first para gestión de patrimonio personal. React + Vite, datos en `localStorage`.
 
-### Novedades v1.2 (móvil iPhone)
-- Sin scroll horizontal ni zoom al usar inputs
-- Cabeceras apiladas y botones en grid en todas las páginas
-- Sorare: pestañas en lista vertical
-- Safe areas, PWA y optimización para pantalla completa del iPhone
+## Novedades v1.4.0
 
-### Novedades v1.1 (Sorare)
-- Carteras Cash y ETH con botón para añadir fondos
-- Al comprar carta: elegir pago (Cash Sorare, ETH o Apple Pay)
-- Pestaña Movimientos con historial completo del balance
-- Galería de cartas agrupada por rareza (Limited, Rare, Super Rare, Única)
+- Rediseño visual: hero degradado en Dashboard, nav con blur y animaciones
+- Paleta refinada, sombras suaves y tipografía mejorada en toda la app
+
+## Novedades v1.3.x
+
+- **Carteras** banco y efectivo con historial de movimientos
+- **Mes en 0€** hasta cobrar nómina y añadir efectivo
+- **Día de cargo** en gastos fijos y deudas con cobro automático
+- **Metas → Gastos**: el ahorro crea apuntes automáticos
+- **Historial mensual**: cerrar mes y ver resúmenes anteriores
+- Correcciones de saldos, cargos automáticos y cartera Sorare
+
+Ver [CHANGELOG.md](./CHANGELOG.md) para el detalle completo.
 
 ## Estructura
 
-- **Inicio** — Dashboard con resumen cripto, cuenta vivienda, deudas, gráfico de gasto
-- **Gastos** — Diario de gastos e ingresos extra por categoría
-- **Metas** — Objetivos de ahorro con fecha límite y prioridad 1-5
-- **Sorare** — Gestión de cartas, ventas, premios y balance
-- **Nómina** — Reparto recomendado de la nómina, gastos fijos, histórico
+| Pestaña | Contenido |
+|---------|-----------|
+| **Inicio** | Carteras, resumen, metas, gráfico de gastos, cripto, deudas |
+| **Gastos** | Diario de gastos e ingresos por categoría (banco/efectivo) |
+| **Metas** | Objetivos de ahorro con fecha límite y prioridad |
+| **Sorare** | Cartas, ventas, premios ETH y carteras Cash/ETH |
+| **Nómina** | Reparto de nómina, gastos fijos, deudas, cierre de mes |
 
 ## Instalación local
 
@@ -31,24 +37,39 @@ npm install
 npm run dev
 ```
 
-## Despliegue en Vercel
+Abre [http://localhost:5173](http://localhost:5173).
 
-### Opción 1 — Vercel CLI
+## Build de producción
+
 ```bash
-npm install -g vercel
-vercel
+npm run build
+npm run preview   # previsualizar dist/
 ```
 
-### Opción 2 — GitHub + Vercel (recomendado)
-1. Sube el proyecto a un repositorio GitHub privado
-2. Ve a https://vercel.com/new
-3. Importa el repositorio
-4. Framework preset: **Vite**
-5. Build command: `npm run build`
-6. Output directory: `dist`
-7. Deploy
+## Despliegue en Vercel
 
-Los datos se guardan en **localStorage** del navegador, así que persisten entre sesiones en el mismo dispositivo. Si quieres sincronizar entre dispositivos en el futuro, el siguiente paso sería añadir Supabase o Firebase.
+### GitHub + Vercel (recomendado)
 
-## Actualizar préstamo
-En `src/data/defaults.js` puedes editar `DEBTS_DEFAULT` para ajustar el progreso del préstamo. Una vez desplegado, los datos que introduces en la app se guardan en localStorage y no dependen de los defaults.
+1. Repositorio: `https://github.com/josumamgar-gif/123456789`
+2. Importar en [vercel.com/new](https://vercel.com/new)
+3. Framework: **Vite**
+4. Build command: `npm run build`
+5. Output directory: `dist`
+6. Deploy
+
+Cada push a `main` despliega automáticamente si el proyecto está vinculado.
+
+### Vercel CLI
+
+```bash
+npm install -g vercel
+vercel --prod
+```
+
+## Datos
+
+Los datos se guardan en **localStorage** del navegador. Persisten entre sesiones en el mismo dispositivo. No hay sincronización entre dispositivos.
+
+## Configuración
+
+Edita `src/data/defaults.js` para nómina, gastos fijos, deudas y categorías iniciales. Una vez en uso, los datos de la app viven en localStorage.

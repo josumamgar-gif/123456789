@@ -1,10 +1,10 @@
 {
   "name": "Patrimonio",
   "short_name": "Patrimonio",
-  "description": "App de gestión de patrimonio personal",
+  "description": "Gestión de patrimonio personal: gastos, metas, Sorare y nómina",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f5f5f5",
+  "background_color": "#f1f3f9",
   "theme_color": "#4a6cf7",
   "orientation": "portrait",
   "icons": [

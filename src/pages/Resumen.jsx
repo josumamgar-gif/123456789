@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useApp } from '../context/AppContext'
+import AppVersion from '../components/AppVersion'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { format, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -644,6 +645,8 @@ export default function Resumen() {
         </ResponsiveContainer>
         </div>
       </div>
+
+      <AppVersion />
 
       {/* Modals */}
       {modal === 'income' && <EditIncomeModal onClose={() => setModal(null)} />}
