@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.0.1] — 2026-07-03
+
+### Sorare
+- Reinicio de carteras Cash y ETH a 0€ para cargar datos manualmente
+- Limpieza de cartas, premios, movimientos y apuntes Sorare en Gastos (migración v3)
+
 ## [2.0.0] — 2026-07-03
 
 ### Nueva estructura (6 pestañas)
