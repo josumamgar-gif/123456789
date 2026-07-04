@@ -1,22 +1,11 @@
 import React, { useState } from 'react'
 import { useApp } from '../context/AppContext'
+import Modal from '../components/Modal'
 import { differenceInDays, parseISO } from 'date-fns'
 import { TX_PAYMENT_METHODS, TX_PAYMENT_LABELS } from '../data/defaults'
 
 const fmt = (n) => n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const PRIORITY_COLORS = { 1: 'var(--red)', 2: 'var(--orange)', 3: 'var(--yellow)', 4: 'var(--blue)', 5: 'var(--text2)' }
-
-function Modal({ title, onClose, children }) {
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-sheet" onClick={e => e.stopPropagation()}>
-        <div className="modal-handle" />
-        <h2 style={{ fontFamily: 'var(--font-head)', fontSize: 18, fontWeight: 700, marginBottom: 16 }}>{title}</h2>
-        {children}
-      </div>
-    </div>
-  )
-}
 
 function GoalModal({ goal, onClose }) {
   const { addGoal, updateGoal } = useApp()

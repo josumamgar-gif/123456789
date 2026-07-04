@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { AppProvider } from './context/AppContext'
 import { ThemeProvider } from './context/ThemeContext'
 import BottomNav from './components/BottomNav'
@@ -26,6 +26,23 @@ function useKeyboardOnInputOnly() {
   }, [])
 }
 
+function AppRoutes() {
+  const location = useLocation()
+  return (
+    <div key={location.pathname} className="route-view">
+      <Routes location={location}>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/gastos" element={<Gastos />} />
+        <Route path="/metas" element={<Metas />} />
+        <Route path="/sorare" element={<Sorare />} />
+        <Route path="/resumen" element={<Resumen />} />
+        <Route path="/inversion" element={<Inversion />} />
+      </Routes>
+      <BottomNav />
+    </div>
+  )
+}
+
 export default function App() {
   useKeyboardOnInputOnly()
 
@@ -34,15 +51,7 @@ export default function App() {
       <AppProvider>
         <BrowserRouter>
           <div className="app-shell">
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/gastos" element={<Gastos />} />
-              <Route path="/metas" element={<Metas />} />
-              <Route path="/sorare" element={<Sorare />} />
-              <Route path="/resumen" element={<Resumen />} />
-              <Route path="/inversion" element={<Inversion />} />
-            </Routes>
-            <BottomNav />
+            <AppRoutes />
           </div>
         </BrowserRouter>
       </AppProvider>

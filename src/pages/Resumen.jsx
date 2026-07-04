@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useApp } from '../context/AppContext'
 import AppVersion from '../components/AppVersion'
+import Modal from '../components/Modal'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { format, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -21,19 +22,6 @@ const DueDaySelect = ({ value, onChange }) => (
     </p>
   </div>
 )
-
-// ── Modal genérico ──────────────────────────────────────
-function Modal({ title, onClose, children }) {
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-sheet" onClick={e => e.stopPropagation()}>
-        <div className="modal-handle" />
-        <h2 style={{ fontFamily: 'var(--font-head)', fontSize: 18, fontWeight: 700, marginBottom: 16 }}>{title}</h2>
-        {children}
-      </div>
-    </div>
-  )
-}
 
 // ── Editar nómina ───────────────────────────────────────
 function EditIncomeModal({ onClose }) {

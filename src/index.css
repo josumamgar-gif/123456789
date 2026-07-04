@@ -153,7 +153,11 @@ input, select, textarea {
   max-width: 100%;
   overflow: hidden;
   box-shadow: var(--shadow-sm);
-  transition: box-shadow 0.2s ease, transform 0.15s ease;
+  transition: box-shadow 0.22s ease, transform 0.2s cubic-bezier(0.32, 0.72, 0.22, 1);
+}
+
+.card:active {
+  transform: scale(0.985);
 }
 
 .card-sm {
@@ -164,6 +168,11 @@ input, select, textarea {
   max-width: 100%;
   overflow: hidden;
   box-shadow: var(--shadow-sm);
+  transition: transform 0.2s cubic-bezier(0.32, 0.72, 0.22, 1);
+}
+
+.card-sm:active {
+  transform: scale(0.97);
 }
 
 /* Hero card (Dashboard) */
@@ -267,10 +276,17 @@ input, select, textarea {
   justify-content: center;
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
-  animation: fadeIn 0.18s ease;
+  animation: overlayIn 0.28s ease;
+  transition: opacity 0.2s ease;
 }
 
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.modal-overlay--closing {
+  animation: overlayOut 0.24s ease forwards;
+  pointer-events: none;
+}
+
+@keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes overlayOut { from { opacity: 1; } to { opacity: 0; } }
 
 .modal-sheet {
   background: var(--bg2);
@@ -281,20 +297,75 @@ input, select, textarea {
   max-height: 92dvh;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 20px 18px calc(36px + var(--safe-bottom));
-  animation: slideUp 0.26s cubic-bezier(0.32, 0.72, 0.25, 1);
+  padding: 0 18px calc(36px + var(--safe-bottom));
+  animation: sheetIn 0.38s cubic-bezier(0.32, 0.72, 0.22, 1);
   box-shadow: 0 -12px 40px rgba(15, 18, 30, 0.18);
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  transition: transform 0.28s cubic-bezier(0.32, 0.72, 0.22, 1);
+  will-change: transform;
 }
 
-@keyframes slideUp { from { transform: translateY(48px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.modal-sheet--dragging {
+  transition: none;
+}
+
+.modal-sheet--closing {
+  animation: sheetOut 0.24s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+}
+
+@keyframes sheetIn {
+  from { transform: translateY(100%); opacity: 0.6; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes sheetOut {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(100%); opacity: 0.4; }
+}
+
+.modal-drag-zone {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 10px 24px 6px;
+  margin: 0 -18px 8px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  background: linear-gradient(to bottom, var(--bg2) 70%, transparent);
+}
+
+.modal-drag-zone:active {
+  cursor: grabbing;
+}
 
 .modal-handle {
-  width: 38px;
-  height: 4px;
+  width: 44px;
+  height: 5px;
   background: var(--border2);
-  border-radius: 3px;
-  margin: 0 auto 18px;
+  border-radius: 4px;
+  transition: width 0.2s ease, background 0.2s ease;
+}
+
+.modal-drag-zone:active .modal-handle {
+  width: 52px;
+  background: var(--text3);
+}
+
+.modal-drag-hint {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text3);
+  letter-spacing: 0.04em;
+  margin-top: 6px;
+  opacity: 0.85;
 }
 
 .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 13px; min-width: 0; }
@@ -342,12 +413,65 @@ select.form-input option { background: var(--bg2); }
   padding: 14px var(--app-pad-x);
   padding-bottom: calc(84px + var(--safe-bottom));
   overflow-x: hidden;
-  animation: pageIn 0.28s ease;
 }
 
-@keyframes pageIn {
-  from { opacity: 0; transform: translateY(8px); }
+.route-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  animation: routeIn 0.32s cubic-bezier(0.32, 0.72, 0.22, 1);
+}
+
+@keyframes routeIn {
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+.page > .hero-card,
+.page > .card,
+.page > .card-sm,
+.page > .quick-add-card,
+.page > .invest-hero,
+.page > .sorare-balances,
+.page > .empty-state,
+.page > div[style*="marginBottom"] > .card,
+.page > div[style*="margin-bottom"] > .card {
+  animation: blockIn 0.42s cubic-bezier(0.32, 0.72, 0.22, 1) backwards;
+}
+
+.page > *:nth-child(1) { animation-delay: 0.02s; }
+.page > *:nth-child(2) { animation-delay: 0.06s; }
+.page > *:nth-child(3) { animation-delay: 0.1s; }
+.page > *:nth-child(4) { animation-delay: 0.14s; }
+.page > *:nth-child(5) { animation-delay: 0.18s; }
+.page > *:nth-child(6) { animation-delay: 0.22s; }
+.page > *:nth-child(7) { animation-delay: 0.26s; }
+.page > *:nth-child(8) { animation-delay: 0.3s; }
+
+@keyframes blockIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.tx-list .tx-row,
+.sorare-card,
+.invest-row {
+  animation: rowIn 0.35s cubic-bezier(0.32, 0.72, 0.22, 1) backwards;
+}
+
+.tx-list .tx-row:nth-child(1),
+.sorare-card:nth-child(1) { animation-delay: 0.03s; }
+.tx-list .tx-row:nth-child(2),
+.sorare-card:nth-child(2) { animation-delay: 0.06s; }
+.tx-list .tx-row:nth-child(3),
+.sorare-card:nth-child(3) { animation-delay: 0.09s; }
+.tx-list .tx-row:nth-child(4) { animation-delay: 0.12s; }
+.tx-list .tx-row:nth-child(5) { animation-delay: 0.15s; }
+
+@keyframes rowIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 .page-header {
@@ -555,7 +679,7 @@ select.form-input option { background: var(--bg2); }
   min-width: 0;
   max-width: 64px;
   border-radius: 12px;
-  transition: color 0.15s ease, transform 0.15s ease;
+  transition: color 0.2s ease, transform 0.22s cubic-bezier(0.32, 0.72, 0.22, 1);
 }
 
 .nav-item .nav-icon-wrap {
@@ -568,10 +692,17 @@ select.form-input option { background: var(--bg2); }
   transition: background 0.2s ease;
 }
 
-.nav-item.active { color: var(--accent); }
+.nav-item.active { color: var(--accent); transform: translateY(-1px); }
 
 .nav-item.active .nav-icon-wrap {
   background: var(--accent-light);
+  animation: navPop 0.35s cubic-bezier(0.32, 0.72, 0.22, 1);
+}
+
+@keyframes navPop {
+  0% { transform: scale(0.85); }
+  60% { transform: scale(1.08); }
+  100% { transform: scale(1); }
 }
 
 .nav-item:active { transform: scale(0.92); }
@@ -599,7 +730,19 @@ select.form-input option { background: var(--bg2); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .modal-sheet,
+  .modal-overlay,
+  .route-view,
+  .page > *,
+  .tx-list .tx-row,
+  .sorare-card,
+  .invest-row {
+    animation: none !important;
+    transition: none !important;
   }
 }
 
@@ -632,12 +775,19 @@ select.form-input option { background: var(--bg2); }
   align-items: center;
   justify-content: center;
   gap: 6px;
-  transition: all 0.15s ease;
+  transition: all 0.22s cubic-bezier(0.32, 0.72, 0.22, 1);
+  transform: scale(1);
 }
+
+.quick-pay-btn:active {
+  transform: scale(0.96);
+}
+
 .quick-pay-btn.active {
   border-color: var(--accent);
   background: var(--accent-light);
   color: var(--accent);
+  box-shadow: 0 2px 10px -4px rgba(74, 108, 247, 0.4);
 }
 .quick-add-submit { width: 100%; padding: 14px !important; font-size: 15px !important; }
 .quick-cat-scroll { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 12px; -webkit-overflow-scrolling: touch; }
@@ -671,8 +821,21 @@ select.form-input option { background: var(--bg2); }
   background: var(--bg2);
   color: var(--text2);
   box-shadow: var(--shadow-sm);
+  transition: all 0.22s cubic-bezier(0.32, 0.72, 0.22, 1);
+  transform: scale(1);
 }
-.filter-pill.active { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; border-color: transparent; }
+
+.filter-pill:active {
+  transform: scale(0.94);
+}
+
+.filter-pill.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 4px 14px -4px rgba(74, 108, 247, 0.55);
+  transform: scale(1.02);
+}
 
 /* ── Transaction list ── */
 .tx-list { padding: 0 !important; overflow: hidden; }
