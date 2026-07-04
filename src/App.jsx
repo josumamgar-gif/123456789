@@ -14,8 +14,6 @@ function useKeyboardOnInputOnly() {
   useEffect(() => {
     const blurIfTyping = (e) => {
       if (e.target.closest('input, textarea, select')) return
-      const tap = e.target.closest('button, a.nav-item, .tab-btn, .modal-overlay')
-      if (!tap) return
       const active = document.activeElement
       if (active && ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName)) {
         active.blur()
@@ -29,17 +27,19 @@ function useKeyboardOnInputOnly() {
 function AppRoutes() {
   const location = useLocation()
   return (
-    <div key={location.pathname} className="route-view">
-      <Routes location={location}>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/gastos" element={<Gastos />} />
-        <Route path="/metas" element={<Metas />} />
-        <Route path="/sorare" element={<Sorare />} />
-        <Route path="/resumen" element={<Resumen />} />
-        <Route path="/inversion" element={<Inversion />} />
-      </Routes>
+    <>
+      <div key={location.pathname} className="route-view">
+        <Routes location={location}>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/gastos" element={<Gastos />} />
+          <Route path="/metas" element={<Metas />} />
+          <Route path="/sorare" element={<Sorare />} />
+          <Route path="/resumen" element={<Resumen />} />
+          <Route path="/inversion" element={<Inversion />} />
+        </Routes>
+      </div>
       <BottomNav />
-    </div>
+    </>
   )
 }
 

@@ -100,6 +100,15 @@ body {
   overscroll-behavior: none;
 }
 
+body.modal-open {
+  position: fixed;
+  left: 0;
+  right: 0;
+  width: 100%;
+  overflow: hidden;
+  touch-action: none;
+}
+
 #root {
   min-height: 100%;
   min-height: 100dvh;
@@ -156,8 +165,10 @@ input, select, textarea {
   transition: box-shadow 0.22s ease, transform 0.2s cubic-bezier(0.32, 0.72, 0.22, 1);
 }
 
-.card:active {
-  transform: scale(0.985);
+@media (hover: hover) {
+  .card:active {
+    transform: scale(0.985);
+  }
 }
 
 .card-sm {
@@ -171,8 +182,10 @@ input, select, textarea {
   transition: transform 0.2s cubic-bezier(0.32, 0.72, 0.22, 1);
 }
 
-.card-sm:active {
-  transform: scale(0.97);
+@media (hover: hover) {
+  .card-sm:active {
+    transform: scale(0.97);
+  }
 }
 
 /* Hero card (Dashboard) */
@@ -297,17 +310,22 @@ input, select, textarea {
   max-height: 92dvh;
   overflow-y: auto;
   overflow-x: hidden;
+  overscroll-behavior: contain;
   padding: 0 18px calc(36px + var(--safe-bottom));
   animation: sheetIn 0.38s cubic-bezier(0.32, 0.72, 0.22, 1);
   box-shadow: 0 -12px 40px rgba(15, 18, 30, 0.18);
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
   transition: transform 0.28s cubic-bezier(0.32, 0.72, 0.22, 1);
-  will-change: transform;
+}
+
+.modal-sheet--ready {
+  animation: none;
 }
 
 .modal-sheet--dragging {
   transition: none;
+  will-change: transform;
 }
 
 .modal-sheet--closing {
@@ -325,8 +343,8 @@ input, select, textarea {
 }
 
 .modal-drag-zone {
-  position: sticky;
-  top: 0;
+  position: relative;
+  flex-shrink: 0;
   z-index: 2;
   display: flex;
   flex-direction: column;
@@ -336,10 +354,15 @@ input, select, textarea {
   padding: 10px 24px 6px;
   margin: 0 -18px 8px;
   cursor: grab;
-  touch-action: none;
+  touch-action: pan-y;
   user-select: none;
   -webkit-user-select: none;
   background: linear-gradient(to bottom, var(--bg2) 70%, transparent);
+}
+
+.modal-sheet--dragging .modal-drag-zone {
+  touch-action: none;
+  cursor: grabbing;
 }
 
 .modal-drag-zone:active {
@@ -420,6 +443,7 @@ select.form-input option { background: var(--bg2); }
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
   animation: routeIn 0.32s cubic-bezier(0.32, 0.72, 0.22, 1);
 }
 
