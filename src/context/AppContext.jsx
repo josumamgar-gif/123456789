@@ -7,10 +7,11 @@ import {
   CRYPTO_DEFAULT,
   CATEGORIES_DEFAULT,
   INCOME_DEFAULT,
+  SORARE_BALANCES_DEFAULT,
 } from '../data/defaults'
 
 const AppContext = createContext(null)
-const ACCOUNTING_VERSION = 2
+const ACCOUNTING_VERSION = 3
 
 const monthKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`
 
@@ -35,7 +36,7 @@ export function AppProvider({ children }) {
   const [sorareCards, setSorareCards] = useLocalStorage('sorareCards', [])
   const [sorarePrizes, setSorarePrizes] = useLocalStorage('sorarePrizes', [])
   const [sorareCompetitions, setSorareCompetitions] = useLocalStorage('sorareCompetitions', [])
-  const [sorareBalances, setSorareBalances] = useLocalStorage('sorareBalances', { cash: 0, eth: 0 })
+  const [sorareBalances, setSorareBalances] = useLocalStorage('sorareBalances', SORARE_BALANCES_DEFAULT)
   const [sorareBalanceMoves, setSorareBalanceMoves] = useLocalStorage('sorareBalanceMoves', [])
   const [cryptoPrices, setCryptoPrices] = useLocalStorage('cryptoPrices', {})
   const [bankBalance, setBankBalance] = useLocalStorage('bankBalance', 0)
@@ -60,6 +61,14 @@ export function AppProvider({ children }) {
     setBankBalance(0)
     setCashOnHand(0)
     setPaycheckMonth(null)
+  }
+
+  const resetSorareToZero = () => {
+    setSorareBalances(SORARE_BALANCES_DEFAULT)
+    setSorareBalanceMoves([])
+    setSorareCards([])
+    setSorarePrizes([])
+    setTransactions(prev => prev.filter(t => t.category !== 'sorare' && t.autoSource?.type !== 'sorare'))
   }
 
   const buildMonthSnapshot = (year, month) => {
@@ -128,6 +137,9 @@ export function AppProvider({ children }) {
       if (prev < 2) {
         clearMonthTracking()
         resetWalletsToZero()
+      }
+      if (prev < 3) {
+        resetSorareToZero()
       }
     }
     setAccountingConfig({
